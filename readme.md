@@ -62,74 +62,73 @@ that the content is correct.  If not, there exists a very real possibility of
 creating a segmentation fault or simply getting a very surprising result 
 due to feeding random values into the function.
 
---------------------------------------------------------------------------------  
+XMLFunc::Number class
+---------------------
 
-The XMLFunc::Number class is provided to support both double and integer
-  operations with native C/C++ accuracies.  An object of this class can be
-  constructed from either an integer or a double and can be cast to either
-  an integer or a double.  Casting to the same type as used when constructing
-  the XML::Number object has lossless accuracy.  Casting an integer constructed
-  object to a double value or vice-versa introduces the same accuracy loss (if
-  any associated with the native C/C++ casts.
+MThe XMLFunc::Number class is provided to support both double and integer
+operations with native C/C++ accuracies.  An object of this class can be
+constructed from either an integer or a double and can be cast to either
+an integer or a double.  Casting to the same type as used when constructing
+the XML::Number object has lossless accuracy.  Casting an integer constructed
+object to a double value or vice-versa introduces the same accuracy loss (if
+any associated with the native C/C++ casts.
 
-  XMLFunc::Number iv(1234);    // inherently integer value
-  XMLFunc::Number dv(12.34);   // inherently double value
-   
-  int i1 = int(iv);   // 1234 (lossless)
-  int i2 = int(dv);   // 12   (truncated)
+>  XMLFunc::Number iv(1234);    // inherently integer value
+>  XMLFunc::Number dv(12.34);   // inherently double value
+>   
+>  int i1 = int(iv);   // 1234 (lossless)
+>  int i2 = int(dv);   // 12   (truncated)
+>
+>  double d1 = double(iv);   // 1234.0 (lossless in this case)
+>  double d2 = double(dv);   // 12.34  (lossless)
 
-  double d1 = double(iv);   // 1234.0 (lossless in this case)
-  double d2 = double(dv);   // 12.34  (lossless)
+** Thats it!**
 
---------------------------------------------------------------------------------
-
-Thats it!
-
-# The XML interface
+The XML interface
+=================
 
 And now onto the fun stuff... the XML which defines the XMLFunc...
 
 First and foremost, this is not a full/robust XML parser.  It will recognize
-  and ignore the XML declaration (i.e. <?xml......>.  It will recognize and 
-  ignore XML comments (i.e. <!--    -->).  It will recognize the elements described 
-  below, which can consist of either the open/close tags (e.g. <add>...</add>) or a 
-  self-contained tag (e.g. <integer value=3/> or <argument index=2/>).  The parser 
-  does not recognize unicode as there is no need for this (all tags are defined 
-  in ASCII and all values are numeric).
+and ignore the XML declaration (i.e. <?xml......>.  It will recognize and 
+ignore XML comments (i.e. <!--    -->).  It will recognize the elements described 
+below, which can consist of either the open/close tags (e.g. <add>...</add>) or a 
+self-contained tag (e.g. <integer value=3/> or <argument index=2/>).  The parser 
+does not recognize unicode as there is no need for this (all tags are defined 
+in ASCII and all values are numeric).
 
-Also, I have not been able to figure out how to describe the legal XMLFunc
-  syntax using XSchema due to the recursive nature of the value elements.
-  If someone can tip me off how to implement an "is-a" definition, I will add
-  the appropriate .xsd file to this project.
+* Also, I have not been able to figure out how to describe the legal XMLFunc
+syntax using XSchema due to the recursive nature of the value elements.
+If someone can tip me off how to implement an "is-a" definition, I will add
+the appropriate .xsd file to this project. *
 
---------------------------------------------------------------------------------
+Argument List
+-------------
 
 The first element defines the arguments being passed.  It is a container
-  element whose contents define the names and types of each argument.
-  These must appear in the same order that they will be passed in the
-  Number vector or array in the native C/C++ code.
+element whose contents define the names and types of each argument.
+These must appear in the same order that they will be passed in the
+Number vector or array in the native C/C++ code.
 
 Each argument is defined with the <arg> tag.
 
-  <arg name=var-name type=var-type/>
+>  <arg name=var-name type=var-type/>
 
 where
 
-  var-name is any string consisting of alphanumeric characters (no
-      whitespace and no unicode).
+>  var-name is any string consisting of alphanumeric characters (no whitespace and no unicode).
 
-  var-type is either the literal string "integer" or "double"
+>  var-type is either the literal string "integer" or "double"
 
+### Example:
 
-Example:
+>  <arglist>
+>    <arg name="exponent" type="integer"/>
+>    <arg name="base"     type="double"/>
+>  </arglist>
 
-  <arglist>
-    <arg name="exponent" type="integer"/>
-    <arg name="base"     type="double"/>
-  </arglist>
-
-
---------------------------------------------------------------------------------
+Value Elements
+--------------
 
 The remaining elements in the XML struture each is/has a value.  There may be 
   only one top level value element, which may contain one or more value elements,
