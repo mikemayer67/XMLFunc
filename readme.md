@@ -5,9 +5,7 @@ To use this class, you must first understand the recognized XML tags, attributes
 which define the function to be implemented AND the C++ interface for using the generated
 function.  We will start with the latter as that is the simpler of the two:
 
-================================================================================
-The C++ interface
-================================================================================
+# The C++ interface
 
 There are is a single constructors for an XMLFunc object:
 
@@ -78,10 +76,7 @@ The XMLFunc::Number class is provided to support both double and integer
 
 Thats it!
 
-
-================================================================================
-The XML interface
-================================================================================
+# The XML interface
 
 And now onto the fun stuff... the XML which defines the XMLFunc...
 
