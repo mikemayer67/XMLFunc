@@ -50,10 +50,10 @@ There is also a few convenience functions/operators which wraps the eval method.
 These have exactly the same functionality and the same caveat onthe number
 of arguments passed.  
 
->   XMLFunc::Number eval(const XMLFunc::Number *args) const
->
->   XMLFunc::Number operator()(const std::vector<XMLFunc::Number> &args) const
->   XMLFunc::Number operator()(const XMLFunc::Number *args) const
+    XMLFunc::Number eval(const XMLFunc::Number *args) const
+
+    XMLFunc::Number operator()(const std::vector<XMLFunc::Number> &args) const
+    XMLFunc::Number operator()(const XMLFunc::Number *args) const
 
 Note: passing a std::vector allows the code to verify the number of provided 
 arguments and throw a std::runtime_error exception if not.  Passing a pointer
@@ -73,16 +73,17 @@ the XML::Number object has lossless accuracy.  Casting an integer constructed
 object to a double value or vice-versa introduces the same accuracy loss (if
 any associated with the native C/C++ casts.
 
->  XMLFunc::Number iv(1234);    // inherently integer value
->  XMLFunc::Number dv(12.34);   // inherently double value
->   
->  int i1 = int(iv);   // 1234 (lossless)
->  int i2 = int(dv);   // 12   (truncated)
->
->  double d1 = double(iv);   // 1234.0 (lossless in this case)
->  double d2 = double(dv);   // 12.34  (lossless)
+    XMLFunc::Number iv(1234);    // inherently integer value
+    XMLFunc::Number dv(12.34);   // inherently double value
+    
+    int i1 = int(iv);   // 1234 (lossless)
+    int i2 = int(dv);   // 12   (truncated)
+    
+    double d1 = double(iv);   // 1234.0 (lossless in this case)
+    double d2 = double(dv);   // 12.34  (lossless)
 
-** Thats it!**
+Thats it!
+---------
 
 The XML interface
 =================
