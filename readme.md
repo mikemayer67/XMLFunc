@@ -16,32 +16,33 @@ Constructor
 
 There are is a single constructors for an XMLFunc object:
 
-  XMLFunc(const std::string xml)
+    XMLFunc(const std::string xml)
 
 
 where
 
-  xml is EITHER the name of a file containing the XML or the XML string itself.
-       If the string appears to be a valid file path and if the file exists, it
-       will be assumed that the XML is provided in that file.  Otherwise, it
-       will attempt to parse the string as XML.  (If anyone can think of a case
-       where this could be ambigious, please let me know... I certainly cannot
-       think of such a scenario.)
+> xml is EITHER the name of a file containing the XML or the XML string itself.
+- If the string appears to be a valid file path and if the file exists, it
+    will be assumed that the XML is provided in that file.  
+- Otherwise, it
+    will attempt to parse the string as XML.
+- *If anyone can think of a case where this could be ambigious, please let me know... 
+    I certainly cannot think of such a scenario.)
 
 Invocation
 ----------
 
 There is a single invocation method for an XMLFunc object:
 
-   Number eval(const std::vector<XMLFunc::Number> &args) const
+    Number eval(const std::vector<XMLFunc::Number> &args) const
 
 where
 
-   args is the list of values being passed to the function.  The length must
-       match or exceed the number of arguments identified in the <arglist>
-       element in the input XML.
+> args is the list of values being passed to the function.  
+- The length must match or exceed the number of arguments identified in the 
+    '<arglist>' element in the input XML.
 
-See the description of the XMLFunc::Number class below.
+*See the description of the XMLFunc::Number class below.*
 
 Convenience Functions
 ---------------------
