@@ -18,41 +18,34 @@ There are is a single constructors for an XMLFunc object:
 
     XMLFunc(const std::string xml)
 
-
-where
-
-> xml is EITHER the name of a file containing the XML or the XML string itself.
+where xml is EITHER the name of a file containing the XML or the XML string itself.
 - If the string appears to be a valid file path and if the file exists, it
     will be assumed that the XML is provided in that file.  
 - Otherwise, it
     will attempt to parse the string as XML.
-- *If anyone can think of a case where this could be ambigious, please let me know... 
-    I certainly cannot think of such a scenario.)
+ - _If anyone can think of a case where this could be ambigious, please let me know... 
+    I certainly cannot think of such a scenario.)_
 
 Invocation
-----------
+---------
 
 There is a single invocation method for an XMLFunc object:
 
     Number eval(const std::vector<XMLFunc::Number> &args) const
 
-where
-
-> args is the list of values being passed to the function.  
+where args is the list of values being passed to the function.   
 - The length must match or exceed the number of arguments identified in the 
     '<arglist>' element in the input XML.
 
-*See the description of the XMLFunc::Number class below.*
+_See the description of the XMLFunc::Number class below._
 
 Convenience Functions
----------------------
+--------------------
 
 There is also a few convenience functions/operators which wraps the eval method.
-These have exactly the same functionality and the same caveat onthe number
-of arguments passed.  
+These have exactly the same functionality and the same caveat onthe numberof arguments passed.  
 
     XMLFunc::Number eval(const XMLFunc::Number *args) const
-
     XMLFunc::Number operator()(const std::vector<XMLFunc::Number> &args) const
     XMLFunc::Number operator()(const XMLFunc::Number *args) const
 
@@ -77,7 +70,7 @@ any associated with the native C/C++ casts.
     XMLFunc::Number iv(1234);    // inherently integer value
     XMLFunc::Number dv(12.34);   // inherently double value
     
-    int i1 = int(iv);   // 1234 (lossless)
+    int i1 = int(iv);   // 1234 (lossless
     int i2 = int(dv);   // 12   (truncated)
     
     double d1 = double(iv);   // 1234.0 (lossless in this case)
@@ -99,10 +92,10 @@ self-contained tag (e.g. <integer value=3/> or <argument index=2/>).  The parser
 does not recognize unicode as there is no need for this (all tags are defined 
 in ASCII and all values are numeric).
 
-* Also, I have not been able to figure out how to describe the legal XMLFunc
+_Also, I have not been able to figure out how to describe the legal XMLFunc
 syntax using XSchema due to the recursive nature of the value elements.
 If someone can tip me off how to implement an "is-a" definition, I will add
-the appropriate .xsd file to this project. *
+the appropriate .xsd file to this project._
 
 Argument List
 -------------
