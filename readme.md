@@ -1,15 +1,23 @@
+Overview
+========
+
 XMLFunc is a C++ class that implments a mathematical function (of fairly arbitrary complexity)
-  given a description of that function in XML.
+given a description of that function in XML.
 
 To use this class, you must first understand the recognized XML tags, attributes, and values
 which define the function to be implemented AND the C++ interface for using the generated
 function.  We will start with the latter as that is the simpler of the two:
 
-# The C++ interface
+The C++ interface
+=================
+
+Constructor
+-----------
 
 There are is a single constructors for an XMLFunc object:
 
   XMLFunc(const std::string xml)
+
 
 where
 
@@ -20,7 +28,8 @@ where
        where this could be ambigious, please let me know... I certainly cannot
        think of such a scenario.)
 
---------------------------------------------------------------------------------
+Invocation
+----------
 
 There is a single invocation method for an XMLFunc object:
 
@@ -34,24 +43,24 @@ where
 
 See the description of the XMLFunc::Number class below.
 
-
---------------------------------------------------------------------------------
+Convenience Functions
+---------------------
 
 There is also a few convenience functions/operators which wraps the eval method.
-  These have exactly the same functionality and the same caveat onthe number
-  of arguments passed.  
+These have exactly the same functionality and the same caveat onthe number
+of arguments passed.  
 
-   XMLFunc::Number eval(const XMLFunc::Number *args) const
-
-   XMLFunc::Number operator()(const std::vector<XMLFunc::Number> &args) const
-   XMLFunc::Number operator()(const XMLFunc::Number *args) const
+>   XMLFunc::Number eval(const XMLFunc::Number *args) const
+>
+>   XMLFunc::Number operator()(const std::vector<XMLFunc::Number> &args) const
+>   XMLFunc::Number operator()(const XMLFunc::Number *args) const
 
 Note: passing a std::vector allows the code to verify the number of provided 
-  arguments and throw a std::runtime_error exception if not.  Passing a pointer
-  to an array, however, does not allow this verification and it will be assumed
-  that the content is correct.  If not, there exists a very real possibility of 
-  creating a segmentation fault or simply getting a very surprising result 
-  due to feeding random values into the function.
+arguments and throw a std::runtime_error exception if not.  Passing a pointer
+to an array, however, does not allow this verification and it will be assumed
+that the content is correct.  If not, there exists a very real possibility of 
+creating a segmentation fault or simply getting a very surprising result 
+due to feeding random values into the function.
 
 --------------------------------------------------------------------------------  
 
