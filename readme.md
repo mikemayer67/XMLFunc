@@ -110,9 +110,9 @@ Each argument is defined with the \<arg> tag.
 
 where
 
->  var-name is any string consisting of alphanumeric characters (no whitespace or unicode, and must not start with a digit).
+>  var-name is any string consisting of alphanumeric characters (no whitespace or unicode, and must not start with a digit).  *This attribute is optional.  The argument must be referenced by index if not specified.*
 
->  var-type is either the literal string "integer" or "double"
+>  var-type is either the literal string "integer" or "double".  *This attribute is optional. It defaults to double if not specified.*
 
 ### Example:
 
