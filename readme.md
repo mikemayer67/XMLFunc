@@ -135,11 +135,13 @@ There are two basic types of value elements: inputs and operators.  Inputs are
   
   There are no attributes which apply to all value elements.
 
->  (value) := (input)|(operator)
+    value := input|operator
 
 --------------------------------------------------------------------------------
 
 There are two types of input elements: arguments and constants.
+
+    input := <arg>|constant
 
 - Arguments reference one of the elements in the input array of values.  These can change
   with every invocation of the XMLFunc object in the C++ code.  
@@ -151,26 +153,39 @@ Arguments are specified using the \<arg> tag (different from above) using
     either a name or index attributes.  A specified name value must match one of the names
     in the <arglist>.  An index value must be a non-negative integer in the 
     range 0 to (num_args)-1.
+  
+**Example**  (these two are identical given the arglist above)
 
-  Constants are specified using either the \<integer> or \<double> tag.  The
-    value of the constant is specifed either using the 'value' attribute or
-    by placing it between \<integer>...\</integer>  or \<double>...\</double>
-    tags.  The specified value should be an integer for the \<integer> tag, but
-    may be either a double or an integer for the \<double> tag.
+    <arg name="exponent"/>
+    <arg index="0"/>  
 
-    (input) := arg|integer|double
+Constants may be specified either directly or by using either the \<integer> or \<double> tag.
 
-  Examples:
+    constant := number_sting|<integer>|<double>
+
+- If specified directly
+  - If it contains nothing but digits, it will be considered an integer value.  
+  - Otherwise, it will be considered a double value.
+- If specified using the \<integer> or \<double> tags
+   - The actual value may be specified using the value attribute or may be
+     specified between opening/closing tags
+   - The value will be cast to the specified type.
+
+**Example**  (these two are identical given the arglist above)
+
+    <add>   <!-- adds four integer values of 3 -->
+      3
+      \<integer value="3"/>
+      \<integer>3</integer>
+      \<integer value="3.14159">
+    </add>  
     
-    <arg name="exponent"/>        (these two are identical given arglist above)
-    <arg index="0"/>          
-
-    <integer value="3"/>          (these two are identical)
-    <integer>3</integer>
-
-    <double value="1214.1967"/>   (these two are identical)
-    <double>1213.1967</double>
-
+    <add>   <!-- adds four double values (ALMOST 4pi) -->
+      3.14159
+      \<double value="3.14159"/>
+      \<double>3.14159</double>
+      \<double value="3">
+    </add> 
 
 --------------------------------------------------------------------------------
 
@@ -194,14 +209,17 @@ When specifying operand values by attribute, the value must be either a numeric
   argument by index will not work as the index will be interpreted as a numeric
   value.
 
-    (operator) := (unary-op)|(binary-op)|(list-op)
+    operator := unary-op|binary-op|list-op
 
 --------------------------------------------------------------------------------
 
-**Unary** operators take a single operand.  Note that this is a bit of a misnomer
-  in that many of thes 'operands' are actually functions.  The value of the
-  operand may be provided either via the 'arg' attribute or as a single value 
-  element between the operator tags. 
+**Unary** operators take a single operand.  Note that this is a bit of a misnomer in that many of these 'operands' are actually functions
+
+- The value of the operand may be provided via the 'arg' attribute.  
+- The value of the operand may be provided as a single value element between the 
+    opening/closing operator tags
+- The value may be numeric, the name of one of the arguments in the \<arglist>, 
+    or a value element.
 
 The list of available unary operators is as follows:
 
@@ -220,32 +238,44 @@ The list of available unary operators is as follows:
 -  ln    (natural log)
 -  log   (* see note)
 
-  * While log is listed as a unary-operator, it has a slight differeence
+*While log is listed as a unary-operator, it has a slight differeence
     from the other unary operators in that it accepts 'base' as an optional 
     attribute (base=10 if not specified)
     
-  * All trig functions use radians
+All trig functions use radians
 
-**Examples:**
+**Examples:**  *these are all*  -cos(angle)
 
--cos(angle)
-
-    <neg>
+    <neg>  <!-- -cos(angle) -->
       <cos>
         <rad><arg name="angle"></rad>
       </cos>
     </neg>
-
-or
-
+    
     <neg>
       <cos>
         <rad arg="angle"></rad>
       </cos>
     </neg>
+   
+    <neg>
+      <cos>
+        <rad>angle</rad>
+      </cos>
+    </neg>
 
-| log_2(10.0) |
+*these are all*  | log_2(10.0) |
 
+    <abs>
+      <log base="2">
+        <double value="10.0"/>
+      </log>
+    </abs>
+    
+    <abs>
+      <log base="2">10.0</log>
+    </abs>
+    
     <abs>
       <log arg="10.0" base="2"/>
     </abs>
@@ -253,10 +283,15 @@ or
 --------------------------------------------------------------------------------
 
 **Binary** operators take two operands. Again, one of these operators is actually
-  a function. The values of the opearands may be provieded either via the
-  'arg1' and 'arg2' attributes, a pair of value elements between the operator
-  tags, or one of each.  Note that if arg1 is provided as an attribute, the
-  value between the tags will be used as arg2 and vice versa.
+  a function. 
+  
+- The values of the operands may be provided via the 'arg1' and 'arg2' attributes.  
+    *(the value may be either a number or the name of one of the arguments listed in \<arglist>)*
+- The values of the operands may be provided as a pair of value elements between the opening/closing tags
+- The values of the operands may be provided using a mixture of these two approaches.  
+    *(if arg1 is provided as an attribute, the value between the tags will be used 
+    as arg2 and vice versa)*
+
 
 The list of available binary operators is as follows:
 
@@ -266,14 +301,11 @@ The list of available binary operators is as follows:
 - mod    (returns the arg2 modulus of arg1)
 - atan2  (returns the arctangengent of arg2/arg1)
 
-  * If both arg1 and arg2 are integers, the result will be an integer with
-    the normal C/C++ truncation rules applied
+If both arg1 and arg2 are integers, the result will be an integer with the normal C/C++ truncation rules applied
 
-  * All trig functions use radians
+All trig functions use radians
 
-**Examples:**
-
-  e ^ ( -x^2 / 5 ) :=
+**Examples:**  *these are all exp( -x^2 / 5)*
 
     <exp>
       <neg>
@@ -282,11 +314,29 @@ The list of available binary operators is as follows:
         </div>
       </neg>
     </exp>
+    
+    <exp>
+      <neg>
+        <div arg2="5">
+          <pow>
+            <arg name="x">
+            2
+          </pow>
+        </div>
+      </neg>
+    </exp>
 
     
 
 --------------------------------------------------------------------------------
 
-List operators take two or more operands.  Here, the values must be provided
-  as value elements between the operator tags.
+**List** operators take two or more operands.  Here, the values must be provided
+  between the opening/closing operator tags.
+  
+The list of available list operators is much shorter:
+
+- add  (returns the sum of all of the values)
+- mult (returns the product of all of the values)
+
+See the section on input elements above for an example.
 
