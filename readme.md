@@ -29,30 +29,20 @@ where xml is **either** the name of a file containing the XML or the XML string 
 Invocation
 ---------
 
-There is a single invocation method for an XMLFunc object:
+There are two variations on the invocation method for an XMLFunc object:
 
     XMLFunc::Number eval(const std::vector<XMLFunc::Number> &args) const
+    XMLFunc::Number eval(const XMLFunc::Number *args) const
 
-where **args** is the list of values being passed to the function.  The length of the list must match or exceed the number of arguments identified in the \<arglist> element in the input XML.
+- In both cases, **args** is a list of values being passed to the function for evaluation.  
+- In both cases, the length of the list must match or exceed the number of arguments identified
+    in the \<arglist> element in the input XML
+- In the first case, having insufficient values results in a std::runtime_error being thrown.
+- In the second case, having insufficient values will almost certainly result in unpredictable results
+    and may very will likely lead to a segmentation fault.
 
 _See the description of the XMLFunc::Number class below._
 
-Convenience Functions
---------------------
-
-There is also a few convenience functions/operators which wraps the eval method.
-These have exactly the same functionality and the same caveat on the number of arguments passed.  
-
-    XMLFunc::Number eval(const XMLFunc::Number *args) const
-    XMLFunc::Number operator()(const std::vector<XMLFunc::Number> &args) const
-    XMLFunc::Number operator()(const XMLFunc::Number *args) const
-
-*Note: passing a std::vector allows the code to verify the number of provided 
-arguments and throw a std::runtime_error exception if not.  Passing a pointer
-to an array, however, does not allow this verification and it will be assumed
-that the content is correct.  If not, there exists a very real possibility of 
-creating a segmentation fault or simply getting a very surprising result 
-due to feeding random values into the function.*
 
 XMLFunc::Number class
 ---------------------
@@ -221,22 +211,24 @@ When specifying operand values by attribute, the value must be either a numeric
 - The value may be numeric, the name of one of the arguments in the \<arglist>, 
     or a value element.
 
-The list of available unary operators is as follows:
+The list of available unary operators is as follows: (*items marked with a D always return a double value*)
 
--  neg   (changes the sign of the argument)
--  sin   (sine trig function)
--  cos   (cosine trig function)
--  tan   (tangent trig function)
--  asin  (arcsine trig function)
--  acos  (arccosine trig function)
--  atan  (arctangent trig function)
--  deg   (converts a radian value to degrees)
--  rad   (converts a degree value to radians)
--  abs   (absolute value)
--  sqrt  (square root)
--  exp   (e raised to the specified power)
--  ln    (natural log)
--  log   (* see note)
+<pre>
+neg      changes the sign of the argument
+sin  (D) sine trig function
+cos  (D) cosine trig function
+tan  (D) tangent trig function
+asin (D) arcsine trig function
+acos (D) arccosine trig function
+atan (D) arctangent trig function
+deg  (D) converts a radian value to degrees
+rad  (D) converts a degree value to radians
+abs      absolute value
+sqrt (D) square root
+exp  (D) e raised to the specified power
+ln   (D) natural log
+log  (D) * see note
+</pre>
 
 *While log is listed as a unary-operator, it has a slight differeence
     from the other unary operators in that it accepts 'base' as an optional 
@@ -293,13 +285,15 @@ All trig functions use radians
     as arg2 and vice versa)*
 
 
-The list of available binary operators is as follows:
+The list of available binary operators is as follows: (*items marked with a D always return a double value*)
 
-- sub    (subtracts arg2 from arg1)
-- div    (divides arg1 by arg2, * see note)
-- pow    (raises arg1 to the power arg2)
-- mod    (returns the arg2 modulus of arg1)
-- atan2  (returns the arctangengent of arg2/arg1)
+<pre>
+sub       subtracts arg2 from arg1
+div       divides arg1 by arg2, * see note
+pow   (D) raises arg1 to the power arg2
+mod   (D) returns the arg2 modulus of arg1
+atan2 (D) returns the arctangengent of arg2/arg1
+</pre>
 
 If both arg1 and arg2 are integers, the result will be an integer with the normal C/C++ truncation rules applied
 
@@ -335,8 +329,10 @@ All trig functions use radians
   
 The list of available list operators is much shorter:
 
-- add  (returns the sum of all of the values)
-- mult (returns the product of all of the values)
+<pre>
+add      returns the sum of all of the values
+mult     returns the product of all of the values
+</pre>
 
 See the section on input elements above for an example.
 

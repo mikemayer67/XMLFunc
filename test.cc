@@ -1,23 +1,26 @@
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <stdlib.h>
+
 #include "XMLFunc.h"
 
 using namespace std;
 
 int main(int argc,char **argv)
 {
-  XMLFunc::Number i(0x7fffffff);
-  XMLFunc::Number d(456.789);
+  XMLFunc q1("quad_1.xml");
 
-  int ii = int(i);
-  int di = double(i);
+  ifstream q2s("quad_2.xml");
+  if( q2s.good() == false ) 
+  {
+    cerr << endl << "Failed to open quad_2.xml" << endl << endl;
+    exit(1);
+  }
+  stringstream q2xml;
+  q2xml << q2s.rdbuf();
 
-  double id = int(d);
-  double dd = double(d);
-  
-  cout << "ii: " << ii << endl;
-  cout << "di: " << di << endl;
-  cout << "id: " << id << endl;
-  cout << "dd: " << dd << endl;
+  XMLFunc q2(q2xml.str());
 
   return 0;
 }

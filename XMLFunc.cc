@@ -1,31 +1,228 @@
-#include <XMLFunc.h>
+#include "XMLFunc.h"
 
 #include <fstream>
+#include <sstream>
 #include <stdexcept>
+#include <map>
 
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <errno.h>
 #include <string.h>
 
 using namespace std;
-using namespace XMLFuncImp;
 
 typedef map<string,string> Attributes_t;
 
 // prototypes for support functions
 
-size_t read_tag(const string &s, const string &tag, Attributes_t &, string &value);
-bool   parse_attr(const string &s, size_t attr_start, size_t attr_end, Attributes_t &);
+string  cleanup_xml(const string &xml);
+size_t  read_tag(const string &s, const string &tag, Attributes_t &, string &value);
+bool    parse_attr(const string &s, size_t attr_start, size_t attr_end, Attributes_t &);
 
+typedef XMLFunc::Number      Number_t;
+typedef XMLFunc::Node        Node_t;
+typedef XMLFunc::NodeFactory NodeFactory_t;
+
+typedef vector<Number_t> &Args_t;
+
+
+////////////////////////////////////////////////////////////////////////////////
+// XMLFunc::Node subclasses
+////////////////////////////////////////////////////////////////////////////////
+
+class ConstNode : public Node_t
+{
+  public:
+    ConstNode(const Number_t &n) : value_(n) {}
+    Number_t eval(const Args_t &args) const { return value_; }
+  private:
+    Number_t value_;
+
+class ArgNode : public Node_t
+{
+  public:
+    ArgNode(size_t i) : index_(i) {}
+    Number_t eval(const Args_t &args) const { return args.at(index_); }
+  private:
+    size_t index_;
+};
+
+
+class UnaryNode : public Node_t
+{
+  public:
+    UnaryNode(const string &xml, const string &tag, const NodeFactory_t &);
+
+    ~UnaryNode() { if(op_!=NULL) delete op_; }
+
+  private:
+    Node_t *op_;
+};
+
+class BinaryNode : public Node_t
+{
+  public:
+    BinaryNode(const string &xml, const string &tag, const NodeFactory_t &);
+
+    ~BinaryNode() 
+    { 
+      if(op1_!=NULL) delete op1_;
+      if(op2_!=NULL) delete op2_;
+    }
+
+  private:
+    Node_t *op1_;
+    Node_t *op2_;
+};
+
+class ListNode : public Node_t
+{
+  public:
+    ListNode(const string &xml, const string &tag, const NodeFactory_t &factory);
+
+    ~ListNode() 
+    { 
+      for(vector<Node_t *>::iterator i=ops_.begin(); i!=ops_.end(); ++i)
+      {
+        delete *i;
+      }
+    }
+
+  private:
+    vector<Node_t *> ops_;
+};
+
+class NegNode : public UnaryNode
+{
+  public:
+    Number_t eval(const Args_t &args) const
+    {
+      return op_->eval(args).negate();
+    }
+};
+
+class SinNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class CosNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class TanNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class AsinNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class AcosNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class AtanNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class DegNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class RadNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class AbsNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class SqrtNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class ExpNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class LnNode : public UnaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class LogNode : public UnaryNode
+{
+  public:
+    LogNode(const string &xml, const NodeFactory_t &factory);
+    Number_t eval(const Args_t &args) const;
+  private:
+    Number_t fac_;
+};
+
+class SubNode : public BinaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class DivNode : public BinaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class PowNode : public BinaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class ModNode : public BinaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class Atan2Node : public BinaryNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class AddNode : public ListNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+class MultNode : public ListNode
+{
+  public: Number_t eval(const Args_t &args) const;
+};
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// XMLFunc methods
+////////////////////////////////////////////////////////////////////////////////
 
 // XMLFunc constructor
 
-XMLFunc::XMLFunc(string xml) : root_(NULL)
+XMLFunc::XMLFunc(const string &xml_src) : root_(NULL)
 {
+  string xml = xml_src;
   // Let's see if xml is actually a file.  If so, load it.
 
   struct stat xml_stat;
-  if( stat( io_xml.c_str(), &xml_stat ) == 0 )
+  if( stat( xml_src.c_str(), &xml_stat ) == 0 )
   {
     int fd = open(xml.c_str(), O_RDONLY);
 
@@ -37,14 +234,14 @@ XMLFunc::XMLFunc(string xml) : root_(NULL)
     }
 
     off_t eof = lseek(fd,0,SEEK_END);
-    lseek(fd,0,SEED_SET);
+    lseek(fd,0,SEEK_SET);
 
     char *buffer = new char[1+eof];
     int toRead = eof;
     char *pos = buffer;
     while(toRead)
     {
-      size_t nread = read(fd,pos,toRead);
+      ssize_t nread = read(fd,pos,toRead);
       if(nread < 0)
       {
         stringstream err;
@@ -61,18 +258,26 @@ XMLFunc::XMLFunc(string xml) : root_(NULL)
     delete[] buffer;
   }
 
+  xml = cleanup_xml(xml);
+
   // Extract the arglist
 
   Attributes_t attr;
   string       args;
-  size_t func_start = read_tag(xml,"arglist",attr,args)
+  size_t func_start = read_tag(xml,"arglist",attr,args);
   if(func_start == string::npos) throw runtime_error("XML does not contain a valid <arglist>");
 
-  string value;
-  size_t next_arg = read_tag(args,"arg",attr,value);
-  while(next_arg != string::npos)
+  while(true)
   {
-    XMLFuncImp::ArgInfo info;
+    string value;
+    size_t next_arg = read_tag(args,"arg",attr,value);
+
+    if(next_arg==string::npos) break;
+
+    if(value.empty() == false)
+      throw runtime_error("Invalid XML: The <arg> tag does not expect a value");
+
+    ArgInfo info;
 
     for(Attributes_t::iterator i=attr.begin(); i!=attr.end(); ++i)
     {
@@ -82,8 +287,8 @@ XMLFunc::XMLFunc(string xml) : root_(NULL)
       }
       else if(i->first == "type")
       {
-        if     (i->second == "integer") { info.isInteger = true;  }
-        else if(i->second == "double")  { info.isIntger  = false; }
+        if     (i->second == "integer") { info.type = Number::Integer;  }
+        else if(i->second == "double")  { info.type = Number::Double;   }
         else throw runtime_error("Invalid XML: argument type must be either 'integer' or 'double'");
       }
       else
@@ -92,16 +297,17 @@ XMLFunc::XMLFunc(string xml) : root_(NULL)
       }
     }
 
-    size_t next_arg = read_tag(substr(args,next_arg),"arg",attr,value);
+    argList_.push_back(info);
+    args = args.substr(next_arg);
   }
 
   // Build the root node
 
-  root_ = Node::build(func_start)
-
+  NodeFactory factory(argList_);
+  root_ = factory.build(xml.substr(func_start));
 }
 
-XMLFunc::Number eval(const std::vector<XMLFunc::Number> &args) const
+XMLFunc::Number XMLFunc::eval(const std::vector<XMLFunc::Number> &args) const
 {
   if( args.size() < argList_.size() )
   {
@@ -113,10 +319,11 @@ XMLFunc::Number eval(const std::vector<XMLFunc::Number> &args) const
   return root_->eval(args);
 }
 
-XMLFunc::Number eval(const XMLFunc::Number *argArray) const
+XMLFunc::Number XMLFunc::eval(const XMLFunc::Number *argArray) const
 {
   // No exception will be thrown if argArray doesn't contain
-  //   enough elements... 
+  //   enough elements... which may lead to unpredictable results
+  //   including the real possiblity of a segmentation fault
 
   std::vector<XMLFunc::Number> args;
   for(int i=0; i<argList_.size(); ++i)
@@ -125,6 +332,254 @@ XMLFunc::Number eval(const XMLFunc::Number *argArray) const
   }
 
   return root_->eval(args);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// XMLFunc::Node subclass methods
+////////////////////////////////////////////////////////////////////////////////
+
+UnaryNode::UnaryNode(const string &xml, const string &tag, const NodeFactory_t &factory)
+{
+}
+
+BinaryNode::BinaryNode(const string &xml, const string &tag, const NodeFactory_t &factory)
+{
+}
+
+ListNode::ListNode(const string &xml, const string &tag, const NodeFactory_t &factory)
+{
+}
+
+Number_t SinNode::eval(const Args_t &args) const
+{
+  return sin(double(op_->eval(args)));
+}
+
+Number_t CosNode::eval(const Args_t &args) const
+{
+  return cos(double(op_->eval(args)));
+}
+
+Number_t TanNode::eval(const Args_t &args) const
+{
+  return tan(double(op_->eval(args)));
+}
+
+Number_t AsinNode::eval(const Args_t &args) const
+{
+  return asin(double(op_->eval(args)));
+}
+
+Number_t AcosNode::eval(const Args_t &args) const
+{
+  return acos(double(op_->eval(args)));
+}
+
+Number_t AtanNode::eval(const Args_t &args) const
+{
+  return atan(double(op_->eval(args)));
+}
+
+Number_t DegNode::eval(const Args_t &args) const
+{
+  static double f = 45./atan(1.0);
+  return Number_t( f * double(op_->eval(args)) );
+}
+
+Number_t RadNode::eval(const Args_t &args) const
+{
+  static double f = atan(1.0)/45.;
+  return Number_t( f * double(op_->eval(args)) );
+}
+
+Number_t AbsNode::eval(const Args_t &args) const
+{
+  return op_->eval(args).abs();
+}
+
+Number_t SqrtNode::eval(const Args_t &args) const
+{
+  retun Number_t( sqrt(double(op_->eval(args))) );
+}
+
+Number_t ExpNode::eval(const Args_t &args) const
+{
+  return Number_t( exp(double(op_->eval(args))) );
+}
+
+Number_t LnNode::eval(const Args_t &args) const
+{
+  return Number_t( log(double(op_->eval(args))) );
+}
+
+Number_t LogNode::eval(const Args_t &args) const
+{
+  return Number_t( fac_ * log( double(op_->eval(args))) );
+}
+
+Number_t SubNode::eval(const Args_t &args) const
+{
+  Number_t v1 = op1_->eval(args);
+  Number_t v2 = op2_->eval(args);
+
+  return 
+    ( v1.isInteger() && v2.isInteger() )
+    ? Number_t( int(v1) - int(v2) )
+    : Number_t( double(v1) - double(v2) ) ;
+}
+
+Number_t DivNode::eval(const Args_t &args) const
+{
+  Number_t v1 = op1_->eval(args);
+  Number_t v2 = op2_->eval(args);
+
+  return 
+    ( v1.isInteger() && v2.isInteger() )
+    ? Number_t( int(v1) / int(v2) )
+    : Number_t( double(v1) / double(v2) ) ;
+}
+
+Number_t PowNode::eval(const Args_t &args) const
+{
+  Number_t v1 = op1_->eval(args);
+  Number_t v2 = op2_->eval(args);
+
+  return Number_t( pow( double(v1), double(v2) ) );
+}
+
+Number_t ModNode::eval(const Args_t &args) const
+{
+  Number_t v1 = op1_->eval(args);
+  Number_t v2 = op2_->eval(args);
+
+  return 
+    ( v1.isInteger() && v2.isInteger() )
+    ? Number_t( int(v1) % int(v2) )
+    : Number_t( modf(double(v1),double(v2)) ) ;
+}
+
+Number_t Atan2Node::eval(const Args_t &args) const
+{
+  Number_t v1 = op1_->eval(args);
+  Number_t v2 = op2_->eval(args);
+
+  return Number_t( atan2( double(v1), double(v2) ) );
+}
+
+Number_t AddNode::eval(const Args_t &args) const
+{
+  int    isum(0);
+  double dsum(0.);
+
+  bool isInteger = v1.isInteger() && v2.isInteger();
+
+  for(vector<Node_t *>::iterator op = ops_.begin(); op != ops_.end(); ++op)
+  {
+    Number_t t = op->eval(args);
+
+    isum += int(t);
+    dsum += double(t);
+  }
+
+  return isInteger ? Number_t(isum) : Number_t(dsum);
+}
+
+Number_t MultNode::eval(const Args_t &args) const
+{
+  int    iprod(1);
+  double dprod(1.);
+
+  bool isInteger = v1.isInteger() && v2.isInteger();
+
+  for(vector<Node_t *>::iterator op = ops_.begin(); op != ops_.end(); ++op)
+  {
+    Number_t t = op->eval(args);
+
+    isum *= int(t);
+    dsum *= double(t);
+  }
+
+  return isInteger ? Number_t(isum) : Number_t(dsum);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// XMLFunc::Factory methods
+////////////////////////////////////////////////////////////////////////////////
+
+XMLFunc::Node *XMLFunc::NodeFactory::buildNode(const std::string &xml)
+{
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Support functions
+////////////////////////////////////////////////////////////////////////////////
+
+// Removes XML declaration and comments from XML
+string cleanup_xml(const string &orig_xml)
+{
+  string xml = orig_xml;
+
+  // remove XML prolog(s)
+  //   should only be one, but removes all just in case
+
+  char q = '\0';
+  size_t start_del(-1);
+  size_t start_tag(-1);
+  for(size_t i=0; i<xml.length(); ++i)
+  {
+    char c = xml[i];
+
+    if(q) // in quote
+    {
+      if(c==q) q='\0';  // exit quote
+    }
+    else if(c=='"' || c==''') // enter quote
+    {
+      q=c;
+    }
+    else if(xml.compare(i,5,"<?xml")==0)
+    {
+      if(start_del>=0) throw runtime_error("Invalid XML: nested <?xml tags");
+      start_del = i;
+    }
+    else if(xml.compare(i,2,"?>")==0)
+    {
+      if(start_del<0) throw runtime_error("Invalid XML: ?> found without <?xml");
+      xml.erase(start_del, i+2 - start_del);
+      start_del = -1;
+      i -= 1;
+    }
+    if(c=='<')
+    {
+      if(start_del >= 0 || start_tag >= 0)
+        throw runtime_error("Invalid XML: '<' found unquoted within a tag");
+      start_tag = i;
+    }
+    else if(c=='>')
+      // WORK HERE
+    {
+      throw runtime_error("Invalid XML: nested tags within <?xml ... ?>");
+    }
+  }
+
+  // remove comments
+  
+  start_del=0;
+  while(start_del != string::npos)
+  {
+    start_del = xml.find("<!--");
+    if( start_del != string::npos )
+    {
+      size_t end_del = xml.find("-->");
+      if(end_del==string::npos)
+        throw runtime_error("Invalid XML: <!-- is missing closing -->");
+
+      xml.erase(start_del, end_del + 3 - start_del);
+    }
+  }
+
+  return xml;
 }
 
 
@@ -146,26 +601,12 @@ size_t read_tag(const string &s, const string &tag, Attributes_t &attr, string &
 
     pos += 1;
 
-    if( s.substr(pos,pos+4) == "?xml" )
-    {
-      pos += 4;
-      pos = s.find(">",pos);
-      if( pos == string::npos ) return string::npos;
-      pos += 1;
-    }
-    else if( s.substr(pos,pos+3) == "!--" )
-    {
-      pos += 3;
-      pos = s.find("-->",pos);
-      if( pos == string::npos ) return string::npos;
-      pos += 3;
-    }
-    else if( s.substr(pos,pos+tag.length()) == tag )
+    if( s.substr(pos,pos+tag.length()) == tag )
     {
       pos += tag.length();
       attr_start = pos;
 
-      pos = s.find("/>",pos));
+      pos = s.find("/>",pos);
       if( pos != string::npos )
       {
         attr_end = pos;
@@ -232,12 +673,13 @@ bool parse_attr(const string &s, size_t attr_start, size_t attr_end, Attributes_
       if( a >= attr_end ) return false;
     }
 
-    if(s[a] != '"') return false;
+    char q = s[a];
+    if(q!='"' && q!=''') return false;
 
     ++a;
 
     b = a+1;
-    while( s[b] != '"' )
+    while( s[b] != q )
     {
       ++b;
       if(b >= attr_end) return false;
