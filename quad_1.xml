@@ -1,8 +1,10 @@
+<?xml  ?>
 <!-- Quadratic function using the minus option -->
 <arglist>
   <arg name="a" type="double"/>
   <arg name="b"/>
-  <arg/>
+  <arg type="int"></arg>
+  <arg name="d" type="integer"/>
 </arglist>
 
 <div>
@@ -10,8 +12,8 @@
     <neg arg="b"/>
     <sqrt>
       <sub>
-        <pow>b 2</pow>
-        <mult>4<arg name="a"><arg index=2/></mult>
+        <pow  > b  2</pow>
+        <mult>4<arg name="a"><arg index=2/>  6  </mult>
       </sub>
     </sqrt>
   </sub>

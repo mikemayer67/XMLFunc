@@ -2,7 +2,9 @@
 #define _XMLFUNC_H_
 
 #include <vector>
+#include <map>
 #include <string>
+#include <cmath>
 
 /*!
  * \class XMLFunc
@@ -35,7 +37,9 @@ class XMLFunc
         Number(int v)    : type_(Integer), int_(v), double_(double(v)) {}
         /// \brief double constructor
         Number(double v) : type_(Double),  int_(int(v)), double_(v) {}
-        
+        /// \brief copy constructor
+        Number(const Number &x) : type_(x.type_), int_(x.int_), double_(x.double_) {}
+      
         /// \brief integer cast operator
         operator int(void)    const { return int_;    }
         /// \brief double cast operator
@@ -48,10 +52,20 @@ class XMLFunc
         bool isInteger(void) const { return type_ == Integer; }
 
         /// \brief Changes value to negative of current value
-        void negate(void) { int_ = -int_; double_ = -double_; }
+        const Number &negate(void) 
+        { 
+          int_    = -int_; 
+          double_ = -double_; 
+          return *this; 
+        }
 
         /// \brief Changes value to absolute value of current value
-        void abs(void) { int_ = abs(int_); double_ = fabs(double_); }
+        const Number &abs(void) 
+        { 
+          int_    = std::abs(int_); 
+          double_ = std::fabs(double_); 
+          return *this; 
+        }
 
       private:
         /// \cond PRIVATE
@@ -61,19 +75,7 @@ class XMLFunc
         /// \endcond
     };
 
-    class Node;         // defined below
-    class NodeFactory;  // defined below
-
-    struct ArgInfo
-    {
-      Number::Type_t type;
-      std::string    name;
-
-      ArgInfo(void) : type(Number::Double) {}
-    };
-
-    typedef std::vector<ArgInfo>      ArgList_t;
-    typedef ArgList_t::const_iterator ArgIter_t;
+    typedef std::vector<const Number> Args_t;
 
   public:
 
@@ -94,18 +96,18 @@ class XMLFunc
     /*!
      * \brief Invocation form 1
      *
-     * \param args - list of values being passed to the function.  
+     * \param args - list of values being passed to the function.
      *
-     * \warning The length of the list must match or exceed the number of arguments identified in 
+     * \warning The length of the list must match or exceed the number of arguments identified in
      *   the <arglist> element in the XML or a std::lenth_error exeption will be thrown.
      */
-    Number eval(const std::vector<Number> &args) const;
+    Number eval(const Args_t &args) const;
 
     /*!
      * \brief Invocation form 2
      *
      * \param args - list of values being passed to the function.
-     *   
+     *
      * \warning The length of the array must be sufficient to cover all of the arguments identified
      *   in the <arglist> element of the XML.  Because this cannot be verified at runtime, failure
      *   to enforce this may result in unpredictable results, including the very real possibility
@@ -113,7 +115,7 @@ class XMLFunc
      */
     Number eval(const Number *args) const;
 
-  public:
+  public: // making these public allows Node subclasses to exist outside XMLFunc scope
 
     /*!
      * \class XMLFunc::Node
@@ -127,13 +129,9 @@ class XMLFunc
     {
       /*!
        * The constructor is protected so that only subclasses can be instantiated
-       *
-       * \param xml contains the XML definition of the nodes' function
-       * \param factory references the XML::NodeFactory being used to construct
-       *   the XML function. (Needed for building subnodes).
        */
       protected:
-        Node() {}
+        Node(void) {}
 
       public:
         virtual ~Node() {}
@@ -143,36 +141,9 @@ class XMLFunc
        * input XML file (or subset thereof)
        *
        * \param args is the list of argument values passed to the function being evaluated.
-       */ 
+       */
       public:
-        virtual XMLFunc::Number eval(const std::vector<XMLFunc::Number> &args) const = 0;
-    };
-
-    /*!
-     * \class XMLFunc::NodeFactory
-     * \brief Converts XML into XMLFunc::Node objects
-     */
-    class NodeFactory
-    {
-      public:
-        /*!
-         * \brief Constructor
-         * \param args defines the argument types and names used by the XML function
-         */
-        NodeFactory(const ArgList_t &args) : args_(args) {}
-
-        /*!
-         * \brief Node constructor
-         *
-         * Parses the XML and constructs an object of the correct Node subclass.
-         */
-
-        Node *buildNode(const std::string &xml);
-
-      private:
-        /// \cond PRIVATE
-        ArgList_t args_;
-        /// \endcond
+        virtual XMLFunc::Number eval(const Args_t &args) const = 0;
     };
 
   private:
@@ -184,8 +155,8 @@ class XMLFunc
     /// \cond PRIVATE
     ////////////////////////////////////////////////////////////
 
-    Node      *root_;
-    ArgList_t  argList_;
+    Node    *root_;
+    int      numArgs_;
 
     /// \endcond
 };

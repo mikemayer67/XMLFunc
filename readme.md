@@ -89,10 +89,11 @@ the appropriate .xsd file to this project._
 Argument List
 -------------
 
-The first element defines the arguments being passed.  It is a container
-element whose contents define the names and types of each argument.
-These must appear in the same order that they will be passed in the
-Number vector or array in the native C/C++ code.
+The first element defines the arguments that will be passed to the XMLFunc's
+eval method.  It is identified by the \<arglist> tag and is a container element
+whose contents define the names and types of each argument.  These must appear
+in the same order that they will be passed to the eval method in the C++ code.
+There are no attributes defined for \<arglist>
 
 Each argument is defined with the \<arg> tag.
 
