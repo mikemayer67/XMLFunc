@@ -19,25 +19,28 @@ using namespace std;
 typedef map<string,string> Attributes_t;
 typedef const string &cStrRef_t;
 
+typedef XMLFunc::Number      Number_t;
+typedef Number_t::Type_t     NumberType_t;
+typedef XMLFunc::Node        Node_t;
+typedef XMLFunc::Args_t      Args_t;
+
+class ArgDefs;
+
 // prototypes for support functions
 
-void invalid_xml(cStrRef_t);
-void invalid_xml(cStrRef_t,cStrRef_t);
-void invalid_xml(cStrRef_t,cStrRef_t,cStrRef_t);
-void invalid_xml(cStrRef_t,cStrRef_t,cStrRef_t,cStrRef_t);
-void invalid_xml(cStrRef_t,cStrRef_t,cStrRef_t,cStrRef_t,cStrRef_t);
+void invalid_xml(cStrRef_t msg,cStrRef_t m2="",cStrRef_t m3="",cStrRef_t m4="",cStrRef_t m5="");
 
 bool   is_bracket(cStrRef_t xml, size_t pos);
 string load_xml(cStrRef_t src);
 string cleanup_xml(cStrRef_t xml);
 string read_next_element(cStrRef_t xml, string &key, Attributes_t &, string &body);
 size_t read_next_attr(cStrRef_t xml,size_t pos,string &attr_key,string &attr_value);
-//bool   parse_attr(cStrRef_t s, size_t attr_start, size_t attr_end, Attributes_t &);
 
-typedef XMLFunc::Number      Number_t;
-typedef Number_t::Type_t     NumberType_t;
-typedef XMLFunc::Node        Node_t;
-typedef XMLFunc::Args_t      Args_t;
+Node_t *build_node(string &xml, const ArgDefs &); // modifies xml
+
+bool   string_to_double  (cStrRef_t s, double &dval,  string &extra);
+bool   string_to_integer (cStrRef_t s, long   &ival,  string &extra);
+bool   string_to_token   (cStrRef_t s, string &token, string &extra);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Support classes
@@ -84,6 +87,7 @@ class ArgDefs
 class ConstNode : public Node_t
 {
   public:
+    ConstNode(const Attributes_t &, cStrRef_t body, const ArgDefs &, NumberType_t);
     ConstNode(const Number_t &n) : value_(n) {}
     Number_t eval(const Args_t &args) const { return value_; }
   private:
@@ -93,6 +97,7 @@ class ConstNode : public Node_t
 class ArgNode : public Node_t
 {
   public:
+    ArgNode(const Attributes_t &, cStrRef_t body, const ArgDefs &);
     ArgNode(size_t i) : index_(i) {}
     Number_t eval(const Args_t &args) const { return args.at(index_); }
   private:
@@ -103,7 +108,7 @@ class ArgNode : public Node_t
 class UnaryNode : public Node_t
 {
   public:
-    UnaryNode(cStrRef_t xml, cStrRef_t key, const ArgDefs &);
+    UnaryNode(const Attributes_t &, cStrRef_t body, const ArgDefs &);
 
     ~UnaryNode() { if(op_!=NULL) delete op_; }
 
@@ -114,7 +119,7 @@ class UnaryNode : public Node_t
 class BinaryNode : public Node_t
 {
   public:
-    BinaryNode(cStrRef_t xml, cStrRef_t key, const ArgDefs &);
+    BinaryNode(const Attributes_t &, cStrRef_t body, const ArgDefs &);
 
     ~BinaryNode() 
     { 
@@ -130,7 +135,7 @@ class BinaryNode : public Node_t
 class ListNode : public Node_t
 {
   public:
-    ListNode(cStrRef_t xml, cStrRef_t key, const ArgDefs &);
+    ListNode(const Attributes_t &, cStrRef_t body, const ArgDefs &);
 
     ~ListNode() 
     { 
@@ -144,6 +149,9 @@ class ListNode : public Node_t
 class NegNode : public UnaryNode
 {
   public:
+    NegNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return op_->eval(args).negate();
@@ -153,6 +161,9 @@ class NegNode : public UnaryNode
 class SinNode : public UnaryNode
 {
   public: 
+    SinNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return sin(double(op_->eval(args)));
@@ -162,6 +173,9 @@ class SinNode : public UnaryNode
 class CosNode : public UnaryNode
 {
   public:
+    CosNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return cos(double(op_->eval(args)));
@@ -171,6 +185,9 @@ class CosNode : public UnaryNode
 class TanNode : public UnaryNode
 {
   public:
+    TanNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return tan(double(op_->eval(args)));
@@ -180,6 +197,9 @@ class TanNode : public UnaryNode
 class AsinNode : public UnaryNode
 {
   public:
+    AsinNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return asin(double(op_->eval(args)));
@@ -189,6 +209,9 @@ class AsinNode : public UnaryNode
 class AcosNode : public UnaryNode
 {
   public:
+    AcosNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return acos(double(op_->eval(args)));
@@ -198,6 +221,9 @@ class AcosNode : public UnaryNode
 class AtanNode : public UnaryNode
 {
   public:
+    AtanNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return atan(double(op_->eval(args)));
@@ -207,6 +233,9 @@ class AtanNode : public UnaryNode
 class DegNode : public UnaryNode
 {
   public: 
+    DegNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       static double f = 45./atan(1.0);
@@ -217,6 +246,9 @@ class DegNode : public UnaryNode
 class RadNode : public UnaryNode
 {
   public:
+    RadNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       static double f = atan(1.0)/45.;
@@ -227,6 +259,9 @@ class RadNode : public UnaryNode
 class AbsNode : public UnaryNode
 {
   public:
+    AbsNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return op_->eval(args).abs();
@@ -236,6 +271,9 @@ class AbsNode : public UnaryNode
 class SqrtNode : public UnaryNode
 {
   public:
+    SqrtNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return Number_t( sqrt(double(op_->eval(args))) );
@@ -245,6 +283,9 @@ class SqrtNode : public UnaryNode
 class ExpNode : public UnaryNode
 {
   public:
+    ExpNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return Number_t( exp(double(op_->eval(args))) );
@@ -254,6 +295,9 @@ class ExpNode : public UnaryNode
 class LnNode : public UnaryNode
 {
   public: 
+    LnNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : UnaryNode(attr,body,argDefs) {}
+
     Number_t eval(const Args_t &args) const
     {
       return Number_t( log(double(op_->eval(args))) );
@@ -263,7 +307,7 @@ class LnNode : public UnaryNode
 class LogNode : public UnaryNode
 {
   public:
-    LogNode(cStrRef_t xml, const ArgDefs &);
+    LogNode(const Attributes_t &, cStrRef_t body, const ArgDefs &);
     Number_t eval(const Args_t &args) const
     {
       return Number_t( fac_ * log( double(op_->eval(args))) );
@@ -274,37 +318,65 @@ class LogNode : public UnaryNode
 
 class SubNode : public BinaryNode
 {
-  public: Number_t eval(const Args_t &args) const;
+  public: 
+    SubNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : BinaryNode(attr,body,argDefs) {}
+
+    Number_t eval(const Args_t &args) const;
 };
 
 class DivNode : public BinaryNode
 {
-  public: Number_t eval(const Args_t &args) const;
+  public: 
+    DivNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : BinaryNode(attr,body,argDefs) {}
+
+    Number_t eval(const Args_t &args) const;
 };
 
 class PowNode : public BinaryNode
 {
-  public: Number_t eval(const Args_t &args) const;
+  public: 
+    PowNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : BinaryNode(attr,body,argDefs) {}
+
+    Number_t eval(const Args_t &args) const;
 };
 
 class ModNode : public BinaryNode
 {
-  public: Number_t eval(const Args_t &args) const;
+  public: 
+    ModNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : BinaryNode(attr,body,argDefs) {}
+
+    Number_t eval(const Args_t &args) const;
 };
 
 class Atan2Node : public BinaryNode
 {
-  public: Number_t eval(const Args_t &args) const;
+  public: 
+    Atan2Node(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : BinaryNode(attr,body,argDefs) {}
+
+    Number_t eval(const Args_t &args) const;
 };
 
 class AddNode : public ListNode
 {
-  public: Number_t eval(const Args_t &args) const;
+  public: 
+    AddNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : ListNode(attr,body,argDefs) {}
+
+    Number_t eval(const Args_t &args) const;
 };
 
 class MultNode : public ListNode
 {
-  public: Number_t eval(const Args_t &args) const;
+  public: 
+    MultNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
+      : ListNode(attr,body,argDefs) {}
+
+    Number_t eval(const Args_t &args) const;
 };
 
 
@@ -362,8 +434,19 @@ XMLFunc::XMLFunc(cStrRef_t src) : root_(NULL), numArgs_(0)
     else                 { argDefs.add(type); }
   }
 
-  // WORK HERE
-  //   Add logic to parse the Nodes!!!
+  // Build the root evaluation node
+
+  root_ = build_node(xml,argDefs);
+
+  if( root_ == NULL )
+    throw runtime_error("XML does not contain any valid value elements");
+
+  // Make sure there are no more root value elements
+
+  xml = read_next_element(xml,key,attr,body);
+
+  if(xml.empty()==false)
+    throw runtime_error("XML contains too many root value elements");
 }
 
 Number_t XMLFunc::eval(const Args_t &args) const
@@ -399,20 +482,52 @@ Number_t XMLFunc::eval(const Number_t *argArray) const
 // XMLFunc::Node subclass methods
 ////////////////////////////////////////////////////////////////////////////////
 
-UnaryNode::UnaryNode(cStrRef_t xml, cStrRef_t key, const ArgDefs &argDefs)
+ConstNode::ConstNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs, NumberType_t type)
+{
+  Attributes_t::const_iterator ai = attr.find("value");
+
+  string value_str = ( ai == attr.end() ? body : ai->second );
+
+  string extra;
+  if(type == Number_t::Double)
+  {
+    double dval(0.);
+    if( ! string_to_double( value_str, dval, extra ) ) invalid_xml("Invalid double value:",value_str);
+    value_ = Number_t(dval);
+  }
+  else
+  {
+    integer ival(0);
+    if( ! string_to_integer( value_str, ival, extra ) ) invalid_xml("Invalid integer value:",value_str);
+    value_ = Number_t(ival);
+  }
+  if(extra.empty() == false) invalid_xml("Const node value contains extraneous data:",junk);
+}
+
+
+ArgNode::ArgNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
+{
+  Attributes_t::const_iterator ai = attr.find("index");
+
+  string index_str = ( ai == attr.end() ? body : ai->second );
+
+  string index_str;
+}
+
+UnaryNode::UnaryNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
 {
 }
 
-BinaryNode::BinaryNode(cStrRef_t xml, cStrRef_t key, const ArgDefs &argDefs)
+BinaryNode::BinaryNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
 {
 }
 
-ListNode::ListNode(cStrRef_t xml, cStrRef_t key, const ArgDefs &argDefs)
+ListNode::ListNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
 {
 }
 
-LogNode::LogNode(cStrRef_t xml, const ArgDefs &argDefs)
-  : UnaryNode(xml,"log",argDefs)
+LogNode::LogNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
+  : UnaryNode(attr,body,argDefs)
 {
 }
 
@@ -509,17 +624,16 @@ Number_t MultNode::eval(const Args_t &args) const
 // Support functions
 ////////////////////////////////////////////////////////////////////////////////
 
-void invalid_xml(cStrRef_t s1,cStrRef_t s2,cStrRef_t s3,cStrRef_t s4,cStrRef_t s5) { invalid_xml(s1+" "+s2,s3,s4,s5); }
-void invalid_xml(cStrRef_t s1,cStrRef_t s2,cStrRef_t s3,cStrRef_t s4)              { invalid_xml(s1+" "+s2,s3,s4);    }
-void invalid_xml(cStrRef_t s1,cStrRef_t s2,cStrRef_t s3)                           { invalid_xml(s1+" "+s2,s3);       }
-void invalid_xml(cStrRef_t s1,cStrRef_t s2)                                        { invalid_xml(s1+" "+s2);          }
-
-void invalid_xml(cStrRef_t msg)
+void invalid_xml(cStrRef_t msg,cStrRef_t m2,cStrRef_t m3,cStrRef_t m4,cStrRef_t m5) 
 {
   string err = "Invalid XMLFunc: ";
+  err.append(msg);
+  if( m2.empty() == false ) { err.append(" "); err.append(m2); }
+  if( m3.empty() == false ) { err.append(" "); err.append(m3); }
+  if( m4.empty() == false ) { err.append(" "); err.append(m4); }
+  if( m5.empty() == false ) { err.append(" "); err.append(m5); }
   throw runtime_error(err + msg);
 }
-
 
 bool is_bracket(cStrRef_t xml, size_t pos)
 {
@@ -880,108 +994,88 @@ size_t read_next_attr(cStrRef_t xml,size_t pos,string &attr_key,string &attr_val
   return ++pos;  // step past closing quote
 }
 
+Node_t *build_node(string &xml, const ArgDefs &argDefs)
+{
+  Node_t *rval=NULL;
 
-//{
-//  size_t pos(0);
-//  size_t attr_start(0);
-//  size_t attr_end(0);
-//
-//  bool found(false);
-//  while(found == false)
-//  {
-//    pos = s.find("<",pos);
-//    if( pos == string::npos ) return string::npos;
-//
-//    pos += 1;
-//
-//    if( s.substr(pos,pos+tag.length()) == tag )
-//    {
-//      pos += tag.length();
-//      attr_start = pos;
-//
-//      pos = s.find("/>",pos);
-//      if( pos != string::npos )
-//      {
-//        attr_end = pos;
-//        pos += 2;
-//      }
-//      else
-//      {
-//        pos = s.find(">",pos);
-//        if( pos == string::npos) return string::npos;
-//
-//        attr_end = pos;
-//        pos += 1;
-//
-//        size_t value_end = s.find(string("</")+tag+">");
-//        if( value_end == string::npos ) return string::npos;
-//
-//        value = s.substr(pos,value_end);
-//        pos = value_end + tag.length() + 3;
-//      }
-//
-//      if( parse_attr( s, attr_start, attr_end, attr ) == false ) return string::npos;
-//
-//      found = true;
-//    }
-//  }
-//
-//  return pos;
-//}
-//
-//bool parse_attr(cStrRef_t s, size_t attr_start, size_t attr_end, Attributes_t &attr)
-//{
-//  size_t a = attr_start;
-//  while(a < attr_end)
-//  {
-//    while(isspace(s[a]))
-//    {
-//      ++a;
-//      if( a >= attr_end ) return true;
-//    }
-//
-//    if(isalpha(s[a])==false) return false;
-//
-//    size_t b = a+1;
-//    while(isalnum(s[b]))
-//    {
-//      ++b;
-//      if( b>=attr_end ) return false;
-//    }
-//
-//    string key=s.substr(a,b);
-//
-//    a = b;
-//    while(isspace(s[a]))
-//    {
-//      ++a;
-//      if( a >= attr_end ) return false;
-//    }
-//
-//    if(s[a] != '=') return false;
-//
-//    while(isspace(s[a]))
-//    {
-//      ++a;
-//      if( a >= attr_end ) return false;
-//    }
-//
-//    char q = s[a];
-//    if(q!='"' && q!=''') return false;
-//
-//    ++a;
-//
-//    b = a+1;
-//    while( s[b] != q )
-//    {
-//      ++b;
-//      if(b >= attr_end) return false;
-//    }
-//
-//    attr[key] = s.substr(a,b);
-//
-//    a=b+1;
-//  }
-//
-//  return true;
-//}
+  string key="";
+  Attributes_t attr;
+  string body="";
+
+  xml = read_next_element(xml,key,attr,body);
+
+  if      ( key == "double"  ) { rval = new ConstNode( attr,body,argDefs, Number_t:Double  ); }
+  else if ( key == "float"   ) { rval = new ConstNode( attr,body,argDefs, Number_t:Double  ); }
+  else if ( key == "real"    ) { rval = new ConstNode( attr,body,argDefs, Number_t:Double  ); }
+  else if ( key == "integer" ) { rval = new ConstNode( attr,body,argDefs, Number_t:Integer ); }
+  else if ( key == "int"     ) { rval = new ConstNode( attr,body,argDefs, Number_t:Integer ); }
+  else if ( key == "arg"     ) { rval = new   ArgNode( attr,body,argDefs ); }
+  else if ( key == "neg"     ) { rval = new   NegNode( attr,body,argDefs ); }
+  else if ( key == "sin"     ) { rval = new   SinNode( attr,body,argDefs ); }
+  else if ( key == "cos"     ) { rval = new   CosNode( attr,body,argDefs ); }
+  else if ( key == "tan"     ) { rval = new   TanNode( attr,body,argDefs ); }
+  else if ( key == "asin"    ) { rval = new  AsinNode( attr,body,argDefs ); }
+  else if ( key == "acos"    ) { rval = new  AcosNode( attr,body,argDefs ); }
+  else if ( key == "atan"    ) { rval = new  AtanNode( attr,body,argDefs ); }
+  else if ( key == "deg"     ) { rval = new   DegNode( attr,body,argDefs ); }
+  else if ( key == "rad"     ) { rval = new   RadNode( attr,body,argDefs ); }
+  else if ( key == "abs"     ) { rval = new   AbsNode( attr,body,argDefs ); }
+  else if ( key == "sqrt"    ) { rval = new  SqrtNode( attr,body,argDefs ); }
+  else if ( key == "exp"     ) { rval = new   ExpNode( attr,body,argDefs ); }
+  else if ( key == "ln"      ) { rval = new    LnNode( attr,body,argDefs ); }
+  else if ( key == "log"     ) { rval = new   LogNode( attr,body,argDefs ); }
+  else if ( key == "sub"     ) { rval = new   SubNode( attr,body,argDefs ); }
+  else if ( key == "div"     ) { rval = new   DivNode( attr,body,argDefs ); }
+  else if ( key == "pow"     ) { rval = new   PowNode( attr,body,argDefs ); }
+  else if ( key == "mod"     ) { rval = new   ModNode( attr,body,argDefs ); }
+  else if ( key == "atan2"   ) { rval = new Atan2Node( attr,body,argDefs ); }
+  else if ( key == "add"     ) { rval = new   AddNode( attr,body,argDefs ); }
+  else if ( key == "mult"    ) { rval = new  MultNode( attr,body,argDefs ); }
+  else
+  {
+    invalid_xml("Unrecognized operator key:",key);
+  }
+
+  return rval;
+}
+
+bool string_to_double(cStrRef_t s, double &val, string &extra)
+{
+  stringstream ss(s);
+  s >> val;
+  if( s.fail() ) return false;
+  s >> extra;
+  if( s.good() ) return false; // we DON'T want anything extra...
+  return true;
+}
+
+bool string_to_integer(cStrRef_t s, long &val, string &extra)
+{
+  stringstream ss(s);
+  s >> val;
+  if( s.fail() ) return false;
+  s >> extra;
+  if( s.good() ) return false; // we DON'T want anything extra...
+  return true;
+}
+
+string string_to_token(cStrRef_t s, string &val, string &extra)
+{
+  size_type n = s.length();
+
+  size_type a(0);
+  while( a<n && isspace(s[a]) ) ++a;
+
+  if(a==n) return false;
+
+  size_type b(a);
+  while( b<n && isspace(s[b])==false ) ++b;
+
+  size_type t(b);
+  while(t<n && isspace(s[t]) ) ++t;
+  if( t<n) return false;
+
+  val = s.substr(a,b-a);
+
+  return true;
+}
