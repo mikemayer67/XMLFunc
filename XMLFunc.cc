@@ -30,21 +30,20 @@ class ArgDefs;
 
 void invalid_xml(cStrRef_t msg,cStrRef_t m2="",cStrRef_t m3="",cStrRef_t m4="",cStrRef_t m5="");
 
-bool   is_bracket(cStrRef_t xml, size_t pos);
-string load_xml(cStrRef_t src);
-string cleanup_xml(cStrRef_t xml);
+string load_xml    (cStrRef_t src);
+string cleanup_xml (cStrRef_t xml);
 
-bool   read_element(cStrRef_t xml, string &key, Attributes_t &, string &body, string &tail);
-size_t read_next_attr(cStrRef_t xml,size_t pos,string &attr_key,string &attr_value);
+bool   is_bracket   (cStrRef_t s, size_t pos);
+bool   has_content  (cStrRef_t s);
+
+bool   read_double  (cStrRef_t s, double &dval,  string &tail);
+bool   read_integer (cStrRef_t s, long   &ival,  string &tail);
+bool   read_token   (cStrRef_t s, string &token, string &tail);
+
+bool   read_element (cStrRef_t s, string &key, Attributes_t &, string &body, string &tail);
+size_t read_attr    (cStrRef_t s, size_t pos,string &attr_key,string &attr_value);
 
 Node_t *build_node(cStrRef_t &xml, const ArgDefs &, string &tail); // modifies xml
-
-bool   has_content(cStrRef_t s);
-
-bool   string_to_double  (cStrRef_t s, double &dval,  string &extra);
-bool   string_to_integer (cStrRef_t s, long   &ival,  string &extra);
-bool   string_to_token   (cStrRef_t s, string &token, string &extra);
-bool   get_token         (cStrRef_t s, string &token, string &tail);
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -68,7 +67,7 @@ class ArgDefs
     int index(cStrRef_t name) const
     {
       NameXref_t::const_iterator i = xref_.find(name);
-      if( i == xref_.end() ) invalid_xml("Bad argument name:",name);
+      if( i == xref_.end() ) invalid_xml("Bad argument name (",name,")");
       return i->second;
     }
 
@@ -395,9 +394,7 @@ class MultNode : public ListNode
 
 XMLFunc::XMLFunc(cStrRef_t src) : root_(NULL), numArgs_(0)
 {
-  string xml;
-  xml = load_xml(src);
-  xml = cleanup_xml(xml);
+  string xml = cleanup_xml( load_xml(src) );
 
   // Extract the arg definition list
   
@@ -408,21 +405,18 @@ XMLFunc::XMLFunc(cStrRef_t src) : root_(NULL), numArgs_(0)
 
   bool rc = read_element(xml,key,attr,args,func);
 
-  if(rc==false || key!="arglist")
-    throw runtime_error("XML does not contain a valid <arglist>");
-  if(args.empty())
-    throw runtime_error("<arglist> contains no <arg> entries");
+  if(rc==false || key!="arglist") invalid_xml("missing valid <arglist>");
+  if(args.empty())                invalid_xml("<arglist> contains no <arg> entries");
 
   ArgDefs argDefs;
 
   while(args.empty()==false)
   {
-    string arg;
-    string next_args;
-    rc = read_element(args,key,attr,arg,next_args);
+    string body;
+    rc = read_element(args,key,attr,body,args);
 
-    if(rc==false || key!="arg")
-      throw runtime_error("<arglist> must only contain <arg> elements in its body");
+    if(rc==false || key!="arg") invalid_xml("<arglist> may only contain <arg> elements in its body");
+    if(body.empty()==false)     invalid_xml("<arg>cannot contain a body");
 
     NumberType_t type = Number_t::Double;
 
@@ -434,26 +428,21 @@ XMLFunc::XMLFunc(cStrRef_t src) : root_(NULL), numArgs_(0)
       else if(ai->second == "real")    { type = Number_t::Double; }
       else if(ai->second == "integer") { type = Number_t::Integer; }
       else if(ai->second == "int")     { type = Number_t::Integer; }
-      else invalid_xml("Unknown argument type", ai->second);
+      else invalid_xml("Unknown argument type: ", ai->second);
     }
 
     ai = attr.find("name");
     if(ai != attr.end()) { argDefs.add(type,ai->second); }
     else                 { argDefs.add(type); }
-
-    args = next_args;
   }
 
   // Build the root evaluation node
 
-  string tail;
-  root_ = build_node(func,argDefs,tail);
+  string extra;
+  root_ = build_node(func,argDefs,extra);
 
-  if( root_ == NULL )
-    throw runtime_error("XML does not contain any valid value elements");
-
-  if(has_content(tail))
-    throw runtime_error("XML contains too many root value elements");
+  if( root_ == NULL )      invalid_xml("missing valid root value element");
+  if( has_content(extra) ) invalid_xml("only one root value element allowed");
 }
 
 Number_t XMLFunc::eval(const Args_t &args) const
@@ -495,7 +484,7 @@ ConstNode::ConstNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &ar
 
   Attributes_t::const_iterator ai = attr.find("value");
   
-  bool hasValue = ai != attr.end();
+  bool hasValue = ( ai != attr.end() );
   bool hasBody  = has_content(body);
 
   if( hasValue && hasBody ) invalid_xml("Const node cannot contain both value attribute and a body");
@@ -507,23 +496,23 @@ ConstNode::ConstNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &ar
   if(type == Number_t::Double)
   {
     double dval(0.);
-    if( ! string_to_double( value_str, dval, extra ) ) invalid_xml("Invalid double value:",value_str);
+    if( ! read_double( value_str, dval, extra ) ) invalid_xml("Invalid double value (",value_str,")");
     value_ = Number_t(dval);
   }
   else
   {
     long ival(0);
-    if( ! string_to_integer( value_str, ival, extra ) ) invalid_xml("Invalid integer value:",value_str);
+    if( ! read_integer( value_str, ival, extra ) ) invalid_xml("Invalid integer value (",value_str,")");
     value_ = Number_t(ival);
   }
-  if(extra.empty() == false) invalid_xml("Const node value contains extraneous data:",extra);
+  if( has_content(extra) )                       invalid_xml("Extraneous data (",extra,") following ",value_str);
 }
 
 
 ArgNode::ArgNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
 {
   Attributes_t::const_iterator index_iter = attr.find("index");
-  Attributes_t::const_iterator name_iter = attr.find("name");
+  Attributes_t::const_iterator name_iter  = attr.find("name");
 
   bool hasIndex = index_iter != attr.end();
   bool hasName  = name_iter  != attr.end();
@@ -539,45 +528,37 @@ ArgNode::ArgNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDef
   string extra;
   if(hasBody) // determine if it a name or index
   {
-    if(string_to_integer(body,index,extra))
-    {
-      hasIndex = true;
-    }
-    else if(string_to_token(body,name,extra))
-    {
-      hasName = true;
-    }
-    else if(extra.empty())
-    {
+    if     ( read_integer(body,index,extra) )  { hasIndex = true; }
+    else if(   read_token(body,name,extra)  )  { hasName  = true; {
+    else 
       invalid_xml("Arg body must contain either argument index or name");
-    }
-    else
-    {
-      invalid_xml("Arg body contains extraneous data:",extra);
-    }
+
+    if( has_content(extra) ) 
+      invalid_xml("Arg body contains extraneous data (",extra,")");
   }
   else if(hasIndex)
   {
-    if(string_to_integer(index_iter->second, index, extra) == false)
+    if( read_integer(index_iter->second, index, extra) )
     {
-      if(extra.empty())
-        invalid_xml("Arg index attribute must contain an integer value");
-      else
-        invalid_xml("Arg index attribute contains extraneous data:",extra);
+      if( has_content(extra) ) invalid_xml("Arg index attribute contains extraneous data (",extra,")");
+    }
+    else
+    {
+      invalid_xml("Arg index attribute is not an integer (",index_iter->second,")");
     }
   }
   else // hasName
   {
-    if(string_to_token(index_iter->second, name, extra) == false)
+    if( read_token(index_iter->second, name, extra) )
     {
-      if(extra.empty())
-        invalid_xml("Arg name attribute must contain a non-empty string");
-      else
-        invalid_xml("Arg name attribute contains extraneous data:",extra);
+      if( has_content(extra) ) invalid_xml("Arg name attribute contains extraneous data (",extra,")");
+    }
+    else
+    {
+      invalid_xml("Arg name attribute must contain a non-empty string");
     }
   }
 
-  string extra;
   if(hasIndex)
   {
     index_ = (size_t)index;
@@ -585,13 +566,13 @@ ArgNode::ArgNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDef
     if(index_<0 )
     {
       stringstream err;
-      err << "Argument index " << ival << " cannot be negative";
+      err << "Argument index " << index_ << " cannot be negative";
       invalid_xml(err.str());
     }
     if(index_>=argDefs.size()) 
     {
       stringstream err;
-      err << "Argument index " << ival << " exceeds max value of" << argDefs.size()-1;
+      err << "Argument index " << index_ << " exceeds max value of" << argDefs.size()-1;
       invalid_xml(err.str());
     }
   }
@@ -618,7 +599,7 @@ UnaryNode::UnaryNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &ar
 
   string token;
   string tail;
-  if( get_token(arg_str,token,tail) == false ) invalid_xml("Unary node arg is empty");
+  if( read_token(arg_str,token,tail) == false ) invalid_xml("Unary node arg is empty");
 
   long   ival;
   double dval;
@@ -753,10 +734,10 @@ void invalid_xml(cStrRef_t msg,cStrRef_t m2,cStrRef_t m3,cStrRef_t m4,cStrRef_t 
 {
   string err = "Invalid XMLFunc: ";
   err.append(msg);
-  if( m2.empty() == false ) { err.append(" "); err.append(m2); }
-  if( m3.empty() == false ) { err.append(" "); err.append(m3); }
-  if( m4.empty() == false ) { err.append(" "); err.append(m4); }
-  if( m5.empty() == false ) { err.append(" "); err.append(m5); }
+  if( m2.empty() == false ) { err.append(m2); }
+  if( m3.empty() == false ) { err.append(m3); }
+  if( m4.empty() == false ) { err.append(m4); }
+  if( m5.empty() == false ) { err.append(m5); }
   throw runtime_error(err + msg);
 }
 
@@ -872,7 +853,7 @@ string cleanup_xml(cStrRef_t orig_xml)
     if(start_del == string::npos) break;
 
     size_t end_del = xml.find(decl_end,start_del);
-    if(end_del==string::npos) invalid_xml(decl_start,"is missing closing",decl_end);
+    if(end_del==string::npos) invalid_xml(decl_start," is missing closing ",decl_end);
 
     xml.erase(start_del, end_del + decl_end.size() - start_del);
   }
@@ -888,7 +869,7 @@ string cleanup_xml(cStrRef_t orig_xml)
     if(start_del == string::npos) break;
 
     size_t end_del = xml.find(comment_end,start_del);
-    if(end_del==string::npos) invalid_xml(comment_start,"is missing closing",comment_end);
+    if(end_del==string::npos) invalid_xml(comment_start," is missing closing ",comment_end);
 
     xml.erase(start_del, end_del + comment_end.size() - start_del);
   }
@@ -949,7 +930,7 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
       // This is an empty-element tag (i.e. <key .... />)
       //   There is no body.
       //   We can return immediately
-      if(pos==end-1 || xml[pos+1] != '>') invalid_xml("Missing closing '>' for",key);
+      if(pos==end-1 || xml[pos+1] != '>') invalid_xml("Missing closing '>' for ",key);
 
       // We can return immediately after stripping out current tag
       tail = xml.substr(pos+2);
@@ -962,10 +943,10 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
       pos = read_next_attr(xml,pos,attr_key,attr_value); // advances pos
 
       if(attr_key.empty())
-        invalid_xml("Failed to parse attributes for",key,"tag");
+        invalid_xml("Failed to parse attributes for <",key,">");
 
       if(attr.find(attr_key)!=attr.end()) 
-        invalid_xml("Cannot specify more than one",attr_key,"attribute in",key,"tag");
+        invalid_xml("Cannot specify more than one ",attr_key," attribute in <",key,">");
 
       attr[attr_key] = attr_value;
     }
@@ -976,12 +957,12 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
     else
     {
       stringstream err;
-      err << "Don't know what to do with"<<c<<"in"<<key<<"tag";
+      err << "Don't know what to do with '"<<c<<"' in <"<<key<<">";
       invalid_xml(err.str());
     }
   }
 
-  if(body_start==0) invalid_xml("Missing closing '>' for",key,"tag");
+  if(body_start==0) invalid_xml("Missing closing '>' for <",key,">");
 
   // Here comes the tricky part... we need to find the closing tag.
   //   We need to handle nested tags including open/close pairs and empty-body tags
@@ -1010,7 +991,7 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
       }
       else if(c=='<') 
       {
-        invalid_xml("Nesting '<' in body of",key,"tag");
+        invalid_xml("Nesting '<' in body of <",key,">");
       }
       else if(c=='>') // 
       {
@@ -1026,15 +1007,15 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
       }
       else if(c=='/') // empty-body tag
       {
-        if(pos >= end-1)    invalid_xml("Incomplete body for",key,"tag");
-        if(xml[++pos]!='>') invalid_xml("/ without /> in",key,"tag");
+        if(pos >= end-1)    invalid_xml("Incomplete body for <",key,">");
+        if(xml[++pos]!='>') invalid_xml("/ without /> in <",key,">");
         in_tag = false;
       }
     }
     else if(c=='<') // starting new tag (don't know yet what type)
     {
       in_tag = true;
-      if(pos >= end-1) invalid_xml("Incomplete body for",key,"tag");
+      if(pos >= end-1) invalid_xml("Incomplete body for <",key,">");
 
       in_closing_tag = (xml[pos+1]=='/');
 
@@ -1045,7 +1026,7 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
         {
           body_end = pos-1;
           if( xml.compare(pos+1,key.length(),key) != 0 )
-            invalid_xml("Incorrectly nested tags, cannot find closing tag for",key,"tag");
+            invalid_xml("Incorrectly nested tags, cannot find closing tag for <",key,">");
         }
       }
     }
@@ -1053,7 +1034,7 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
     ++pos; // advance to next character
   }
 
-  if(body_end==0) invalid_xml("Missing closing tag for",key,"tag");
+  if(body_end==0) invalid_xml("Missing closing tag for <",key,">");
   body = xml.substr(body_start, body_end-body_start);
 
   tail = xml.substr(pos);
@@ -1124,13 +1105,14 @@ Node_t *build_node(cStrRef_t &xml, const ArgDefs &argDefs, string &tail)
 
   // first check that the input is not empty
 
-  if( has_content(xml) == false ) return rval;
+  if( has_content(xml) == false ) return NULL;
 
   // next check to see if the string is actually a numeric value or argument name
   
+  bool rc = 
   string token;
   string junk;
-  if( get_token(arg_str,token,junk0okj) == false ) invalid_xml("Unary node arg is empty");
+  if( read_token(arg_str,token,junk) == false ) invalid_xml("Unary node arg is empty");
 
   // next check to see if the string starts with a tag
 
@@ -1171,7 +1153,7 @@ Node_t *build_node(cStrRef_t &xml, const ArgDefs &argDefs, string &tail)
   else if ( key == "mult"    ) { rval = new  MultNode( attr,body,argDefs ); }
   else
   {
-    invalid_xml("Unrecognized operator key:",key);
+    invalid_xml("Unrecognized operator key (",key,")");
   }
 
   return rval;
@@ -1188,55 +1170,49 @@ bool has_content(cStrRef_t s)
 }
 
 // extracts the first token and attempts to interpret it as a double
-//   returns true if the the conversion to double is succesful 
-//       AND there is only one token
-bool string_to_double(cStrRef_t s, double &val, string &extra)
+//   if succesful, true is returned and tail is set to the substring following the first token
+//   otherwise, false is returned and tail is set to the empty string
+bool read_double(cStrRef_t s, double &val, string &tail)
 {
-  string v_str;
-  if( string_to_token( s, v_str, extra ) == false ) return false;
+  string token;
+  if( read_token(s,token,tail) ) return false;
 
-  const char *a = v_str.c_str();
+  const char *a = token.c_str();
   char *b(NULL);
 
   val = strtod(a,&b);
 
-  return (a==b ? false : true);
+  if( a==b ) { tail = ""; return false; }
+  
+  return true;
 }
 
 // extracts the first token and attempts to interpret it as a long integer
-//   returns true if the the conversion to long integer is succesful 
-//       AND there is only one token
-bool string_to_integer(cStrRef_t s, long &val, string &extra)
+//   if succesful, true is returned and tail is set to the substring following the first token
+//   otherwise, false is returned and tail is set to the empty string
+bool read_integer(cStrRef_t s, long &val, string &tail)
 {
-  string v_str;
-  if( string_to_token( s, v_str, extra ) == false ) return false;
+  string token;
+  if( read_token(s,token,tail) ) return false;
 
-  const char *a = v_str.c_str();
+  const char *a = token.c_str();
   char *b(NULL);
 
   val = strtol(a,&b,10);
 
-  return (a==b ? false : true);
+  if( a==b ) { tail = ""; return false; }
+  
+  return true;
 }
 
-// extracts the first token and return true if there is only one token
-bool string_to_token(cStrRef_t s, string &val, string &extra)
+// extracts the first token from the input string
+//   returns true if one is found and sets tail to the following substring
+//   returns false if no token is found
+bool read_token(cStrRef_t s, string &token, string &tail)
 {
-  if( get_token(s,val,extra) == false ) return false;
+  token = "";
+  tail  = "";
 
-  size_t n = extra.length();
-
-  size_t a(0);
-  while( a<n && isspace(extra[a]) ) ++a;
-
-  return a==n;
-}
-
-// returns the first token found and sets tail to the remainder of
-//   the string following the first token.  Returns true if a 
-//   token was found or false otherwise
-bool get_token(cStrRef_t s, string &token, string &tail)
-{
   size_t n = s.length();
 
   size_t a(0);
