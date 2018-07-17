@@ -33,17 +33,19 @@ class XMLFunc
         typedef enum {Integer, Double} Type_t;
 
       public:
+        /// \brief default constructor (0.0)
+        Number(void)     : type_(Double),  ival_(0), dval_(0.0) {}
         /// \brief integer constructor
-        Number(int v)    : type_(Integer), int_(v), double_(double(v)) {}
+        Number(long v)   : type_(Integer), ival_(v), dval_(double(v)) {}
         /// \brief double constructor
-        Number(double v) : type_(Double),  int_(int(v)), double_(v) {}
+        Number(double v) : type_(Double),  ival_(int(v)), dval_(v) {}
         /// \brief copy constructor
-        Number(const Number &x) : type_(x.type_), int_(x.int_), double_(x.double_) {}
+        Number(const Number &x) : type_(x.type_), ival_(x.ival_), dval_(x.dval_) {}
       
         /// \brief integer cast operator
-        operator int(void)    const { return int_;    }
+        operator long(void)   const { return ival_;    }
         /// \brief double cast operator
-        operator double(void) const { return double_; }
+        operator double(void) const { return dval_; }
 
         /// \brief Integer or Double
         Type_t type(void) const { return type_; }
@@ -54,28 +56,28 @@ class XMLFunc
         /// \brief Changes value to negative of current value
         const Number &negate(void) 
         { 
-          int_    = -int_; 
-          double_ = -double_; 
+          ival_ = -ival_; 
+          dval_ = -dval_; 
           return *this; 
         }
 
         /// \brief Changes value to absolute value of current value
         const Number &abs(void) 
         { 
-          int_    = std::abs(int_); 
-          double_ = std::fabs(double_); 
+          ival_    = std::abs(ival_); 
+          dval_ = std::fabs(dval_); 
           return *this; 
         }
 
       private:
         /// \cond PRIVATE
         Type_t type_;
-        int    int_;
-        double double_;
+        long   ival_;
+        double dval_;
         /// \endcond
     };
 
-    typedef std::vector<const Number> Args_t;
+    typedef std::vector<Number> Args_t;
 
   public:
 

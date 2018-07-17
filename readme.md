@@ -132,7 +132,7 @@ There are two basic types of value elements: inputs and operators.  Inputs are
 
 There are two types of input elements: arguments and constants.
 
-    input := <arg>|constant
+    input := argument|constant
 
 - Arguments reference one of the elements in the input array of values.  These can change
   with every invocation of the XMLFunc object in the C++ code.  
@@ -140,15 +140,21 @@ There are two types of input elements: arguments and constants.
   that do not change with every invocation and are (no surprise here) constant
   throughout the life of the XMLFunc object.
 
-Arguments are specified using the \<arg> tag (different from above) using
-    either a name or index attributes.  A specified name value must match one of the names
-    in the <arglist>.  An index value must be a non-negative integer in the 
-    range 0 to (num_args)-1.
-  
-**Example**  (these two are identical given the arglist above)
+Arguments may be specified either by name or by using the <arg> tag.
 
-    <arg name="exponent"/>
-    <arg index="0"/>  
+    argument := argument_name|<arg>
+
+- If specified using the <arg> tag either the name or index attribute must be set (but not both)
+- If specified by name (either directly or by attribute)
+   - the name must exactly match one of the named arguments in <arglist>
+- If specified by index
+   - the index must be an integer in the range 0 to (num_args-1)
+
+**Example**  (these three are identical given the arglist above)
+
+  <cos>base</cos>
+  <cos><arg name="base"/></cos>
+  <cos><arg index="1"/><cos>
 
 Constants may be specified either directly or by using either the \<integer> or \<double> tag.
 
@@ -207,8 +213,7 @@ When specifying operand values by attribute, the value must be either a numeric
 **Unary** operators take a single operand.  Note that this is a bit of a misnomer in that many of these 'operands' are actually functions
 
 - The value of the operand may be provided via the 'arg' attribute.  
-- The value of the operand may be provided as a single value element between the 
-    opening/closing operator tags
+- The value of the operand may be provided as a single value element between the opening/closing operator tags
 - The value may be numeric, the name of one of the arguments in the \<arglist>, 
     or a value element.
 
