@@ -52,6 +52,7 @@ class XMLFunc
 
         /// \brief Returns true if type is Integer
         bool isInteger(void) const { return type_ == Integer; }
+        bool isDouble(void)  const { return type_ == Double;  }
 
         /// \brief Changes value to negative of current value
         const Number &negate(void) 
