@@ -20,7 +20,7 @@ There are is a single constructors for an XMLFunc object:
 
 where xml is **either** the name of a file containing the XML or the XML string itself.
 
-- If the string appears to be a valid path to an XML file, it will be assumed that the XML is provided in that file.  
+- If the string is a valid path to an XML file, it will be assumed that the XML is provided in that file.  
 - Otherwise, it will be assumed that the string is the XML.
 
   *If anyone can think of a case where this could be ambigious, please let me know... 
@@ -29,17 +29,14 @@ where xml is **either** the name of a file containing the XML or the XML string 
 Invocation
 ---------
 
-There are two variations on the invocation method for an XMLFunc object:
+There is a single invocation method for an XMLFunc object:
 
     XMLFunc::Number eval(const std::vector<XMLFunc::Number> &args) const
-    XMLFunc::Number eval(const XMLFunc::Number *args) const
 
-- In both cases, **args** is a list of values being passed to the function for evaluation.  
-- In both cases, the length of the list must match or exceed the number of arguments identified
-    in the \<arglist> element in the input XML
-- In the first case, having insufficient values results in a std::runtime_error being thrown.
-- In the second case, having insufficient values will almost certainly result in unpredictable results
-    and may very will likely lead to a segmentation fault.
+- **args** is a list of values being passed to the function for evaluation.  
+- the length of the list must match or exceed the number of arguments identified
+in the \<arglist> element in the input XML having insufficient values results 
+in a std::runtime_error being thrown.
 
 _See the description of the XMLFunc::Number class below._
 
@@ -79,6 +76,8 @@ First and foremost, this is not a full/robust XML parser.
 - It will recognize the elements described below, which can consist of either:
   - a matched pair of open/close tags (e.g. \<add>...\</add>)
   - a self-contained tag (e.g. \<integer value=3/> or \<argument index=2/>).
+- Untagged data is not allowed (i.e. all raw data appears as attributes)
+- All attributes must be enclosed in quotes (either double or single)
 - The parser does not recognize unicode (*there is no need for it*).
 
 _Also, I have not been able to figure out how to describe the legal XMLFunc
@@ -89,7 +88,7 @@ the appropriate .xsd file to this project._
 Argument List
 -------------
 
-The first element defines the arguments that will be passed to the XMLFunc's
+The first XML element must define the arguments that will be passed to the XMLFunc
 eval method.  It is identified by the \<arglist> tag and is a container element
 whose contents define the names and types of each argument.  These must appear
 in the same order that they will be passed to the eval method in the C++ code.
@@ -101,9 +100,11 @@ Each argument is defined with the \<arg> tag.
 
 where
 
->  var-name is any string consisting of alphanumeric characters (no whitespace or unicode, and must not start with a digit).  *This attribute is optional.  The argument must be referenced by index if not specified.*
+>  var-name is any string consisting of alphanumeric characters (no whitespace or unicode, and must not start with a digit).  
+*This attribute is optional.  The argument must be referenced by index if not specified.*
 
->  var-type is either the literal string "integer" or "double".  *This attribute is optional. It defaults to double if not specified.*
+>  var-type is either the literal string "integer" or "double".  
+*This attribute is optional. It defaults to double if not specified.*
 
 ### Example:
 
@@ -112,20 +113,19 @@ where
       <arg name="base"     type="double"/>
     </arglist>
 
+
 Value Elements
 --------------
 
-The remaining elements in the XML struture each is/has a value.  There may be 
+The remaining elements in the XML struture each has a value.  There can be 
   only one top level value element, which may contain one or more value elements,
-  which may in turn contain one or more value elements, which may ....
+  which may in turn contain one or more value elements, which may in turn ....
 
 There are two basic types of value elements: inputs and operators.  Inputs are
   always leaf nodes in the XML.  Operators may be leaf nodes (if all of its 
-  operaands are specified via attributes) or, more often, as composite elements 
+  operands are specified via attributes) or, more often, as composite elements 
   containing one or more other value elements.  
   
-  There are no attributes which apply to all value elements.
-
     value := input|operator
 
 --------------------------------------------------------------------------------
@@ -135,54 +135,53 @@ There are two types of input elements: arguments and constants.
     input := argument|constant
 
 - Arguments reference one of the elements in the input array of values.  These can change
-  with every invocation of the XMLFunc object in the C++ code.  
-- Constants represent a numerical value 
-  that do not change with every invocation and are (no surprise here) constant
-  throughout the life of the XMLFunc object.
+  with every invocation of the XMLFunc eval method in the C++ code.  
+- Constants represent a numerical value that do not change and are (no surprise here) 
+  constant throughout the life of the XMLFunc object.
 
-Arguments may be specified either by name or by using the <arg> tag.
+Argument elements are identified with the <arg> tag and must be qualified by either the name 
+or index attribute (but not both).
 
-    argument := argument_name|<arg>
+    argument := <arg name=[name]>|<arg index=[index]>
 
-- If specified using the <arg> tag either the name or index attribute must be set (but not both)
-- If specified by name (either directly or by attribute)
-   - the name must exactly match one of the named arguments in <arglist>
-- If specified by index
-   - the index must be an integer in the range 0 to (num_args-1)
-
-**Example**  (these three are identical given the arglist above)
-
-  <cos>base</cos>
-  <cos><arg name="base"/></cos>
-  <cos><arg index="1"/><cos>
-
-Constants may be specified either directly or by using either the \<integer> or \<double> tag.
-
-    constant := number_sting|<integer>|<double>
-
-- If specified directly
-  - If it contains nothing but digits, it will be considered an integer value.  
-  - Otherwise, it will be considered a double value.
-- If specified using the \<integer> or \<double> tags
-   - The actual value may be specified using the value attribute or may be
-     specified between opening/closing tags
-   - The value will be cast to the specified type.
+- If specified by name, the name must exactly match one of the named arguments in <arglist>
+- If specified by index, the index must be an integer in the range 0 to (num_args-1)
 
 **Example**  (these two are identical given the arglist above)
 
-    <add>   <!-- adds four integer values of 3 -->
-      3
-      \<integer value="3"/>
-      \<integer>3</integer>
-      \<integer value="3.14159">
-    </add>  
-    
-    <add>   <!-- adds four double values (ALMOST 4pi) -->
-      3.14159
-      \<double value="3.14159"/>
-      \<double>3.14159</double>
-      \<double value="3">
-    </add> 
+  <cos><arg name="base"/></cos>
+  <cos><arg index="1"/></cos>
+
+Constant elements may be specified using either the \<integer> or \<double> tag. The value
+of the constant must be specified using the value attribute.
+
+    constant := <double value=[value]>|<integer value=[value]>
+
+- The specified value must be parsable as the specified type
+   - A double can take any valid number format (in the range of a C++ double)
+   - An integer can only take a valid integer format (in the range of a C++ long int)
+   - There are no unsigned integer values
+
+**Example**
+
+    <integer value="3"/>
+    <integer value="3.14159"/>   // INVALID
+    <double  value="3"/>
+    <double  value="3.14159"/>
+
+*Note that most of the operator elements listed below are capable of taking input values
+directly via attributes. This will often be cleaner than creating input elements.
+
+  <add arg1="5" arg2="base"/>
+
+  is easier to read than
+
+  <add>
+    \<integer value="5"/>
+    \<arg name="base"/>
+    \<double value="1.2"/>
+    \<arg name="color"/>
+  </add>
 
 --------------------------------------------------------------------------------
 
@@ -210,12 +209,17 @@ When specifying operand values by attribute, the value must be either a numeric
 
 --------------------------------------------------------------------------------
 
-**Unary** operators take a single operand.  Note that this is a bit of a misnomer in that many of these 'operands' are actually functions
+**Unary** operators take a single operand.  
+Note that this is a bit of a misnomer in that many of these 'operands' are actually functions
 
-- The value of the operand may be provided via the 'arg' attribute.  
-- The value of the operand may be provided as a single value element between the opening/closing operator tags
-- The value may be numeric, the name of one of the arguments in the \<arglist>, 
-    or a value element.
+The value of the operand may be provided as a value element between the opening/closing tags
+or may be provided via the arg attribute.
+
+If the value is provided via the arg attribute
+  - and parses as an integer, it will be the same as providing an \<integer> element
+  - and parses as a double, it will be the same as providing a \<double> element
+  - and appears as a name in \<arglist>, it will be the same as providing an \<arg name=[name]> element
+  - otherwise, an exception will be thrown
 
 The list of available unary operators is as follows: (*items marked with a D always return a double value*)
 
@@ -236,13 +240,13 @@ ln   (D) natural log
 log  (D) * see note
 </pre>
 
-*While log is listed as a unary-operator, it has a slight differeence
+*While log is listed as a unary-operator, it has a slight difference
     from the other unary operators in that it accepts 'base' as an optional 
     attribute (base=10 if not specified)
     
 All trig functions use radians
 
-**Examples:**  *these are all*  -cos(angle)
+**Examples:**  *these are both*  -cos(angle)
 
     <neg>  <!-- -cos(angle) -->
       <cos>
@@ -255,14 +259,8 @@ All trig functions use radians
         <rad arg="angle"></rad>
       </cos>
     </neg>
-   
-    <neg>
-      <cos>
-        <rad>angle</rad>
-      </cos>
-    </neg>
 
-*these are all*  | log_2(10.0) |
+*these are both*  | log_2(10.0) |
 
     <abs>
       <log base="2">
@@ -271,25 +269,24 @@ All trig functions use radians
     </abs>
     
     <abs>
-      <log base="2">10.0</log>
-    </abs>
-    
-    <abs>
       <log arg="10.0" base="2"/>
     </abs>
 
 --------------------------------------------------------------------------------
 
-**Binary** operators take two operands. Again, one of these operators is actually
-  a function. 
+**Binary** operators take two operands. (One of these operators is actually a function.)
   
-- The values of the operands may be provided via the 'arg1' and 'arg2' attributes.  
-    *(the value may be either a number or the name of one of the arguments listed in \<arglist>)*
-- The values of the operands may be provided as a pair of value elements between the opening/closing tags
-- The values of the operands may be provided using a mixture of these two approaches.  
-    *(if arg1 is provided as an attribute, the value between the tags will be used 
-    as arg2 and vice versa)*
+The values of the operands may be provided as value element between the opening/closing tags,
+via the arg1 and arg2 attributes, or a combination thereof.
 
+The rules for interpreting the arg attributes are the same as for the unary operators.
+
+- If both values are specified with attributes, the element must not have any content between
+    the open/close tags.
+- If neither is specified with attributes, there must be two value elements included between
+    the open/close tags.
+- If one of the values is specified through an attribute, there must be one value element 
+    included between the open/close tags.  It will be assume to be the other operand value.
 
 The list of available binary operators is as follows: (*items marked with a D always return a double value*)
 
@@ -316,22 +313,22 @@ All trig functions use radians
     </exp>
     
     <exp>
-      <neg>
-        <div arg2="5">
-          <pow>
-            <arg name="x">
-            2
-          </pow>
+      <mult>
+        <integer value="-1"/>
+        <div>
+          <pow arg2="2"><arg name="x"></pow>
+          <integer value="5"/>
         </div>
-      </neg>
+      </mult>
     </exp>
-
-    
 
 --------------------------------------------------------------------------------
 
-**List** operators take two or more operands.  Here, the values must be provided
-  between the opening/closing operator tags.
+**List** operators take two or more operands. 
+
+The values of the first two operans may be provided with the arg1 and arg2 attributes
+using the same rules as for a binary operator.  All other operands must be provided
+as value elements between the opening/closing tags.
   
 The list of available list operators is much shorter:
 

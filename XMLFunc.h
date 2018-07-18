@@ -96,7 +96,7 @@ class XMLFunc
     virtual ~XMLFunc() { if( root_ != NULL ) delete root_; }
 
     /*!
-     * \brief Invocation form 1
+     * \brief Invocation method
      *
      * \param args - list of values being passed to the function.
      *
@@ -105,38 +105,26 @@ class XMLFunc
      */
     Number eval(const Args_t &args) const;
 
-    /*!
-     * \brief Invocation form 2
-     *
-     * \param args - list of values being passed to the function.
-     *
-     * \warning The length of the array must be sufficient to cover all of the arguments identified
-     *   in the <arglist> element of the XML.  Because this cannot be verified at runtime, failure
-     *   to enforce this may result in unpredictable results, including the very real possibility
-     *   of a segmentation fault.
-     */
-    Number eval(const Number *args) const;
-
-  public: // making these public allows Node subclasses to exist outside XMLFunc scope
+  public: // making these public allows Op subclasses to exist outside XMLFunc scope
 
     /*!
-     * \class XMLFunc::Node
+     * \class XMLFunc::Op
      * \brief value node that performs a unary, binary, or list operation/function
      *
      * This is an abstract base class for all operator nodes.  There are a number of
      * built-in subclasses that perform most of the standard mathematical operations.
      * If additional subclasses are needed, code will need to be added in XMLFunc.cpp
      */
-    class Node
+    class Op
     {
       /*!
        * The constructor is protected so that only subclasses can be instantiated
        */
       protected:
-        Node(void) {}
+        Op(void) {}
 
       public:
-        virtual ~Node() {}
+        virtual ~Op() {}
 
       /*!
        * Evaluates and returns the value of the element node as defined by the
@@ -157,8 +145,8 @@ class XMLFunc
     /// \cond PRIVATE
     ////////////////////////////////////////////////////////////
 
-    Node    *root_;
-    int      numArgs_;
+    Op    *root_;
+    int    numArgs_;
 
     /// \endcond
 };

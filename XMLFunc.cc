@@ -17,33 +17,36 @@
 using namespace std;
 
 typedef map<string,string> Attributes_t;
-typedef const string &cStrRef_t;
 
 typedef XMLFunc::Number      Number_t;
 typedef Number_t::Type_t     NumberType_t;
-typedef XMLFunc::Node        Node_t;
+typedef XMLFunc::Op        Op_t;
 typedef XMLFunc::Args_t      Args_t;
 
 class ArgDefs;
 
 // prototypes for support functions
 
-void invalid_xml(cStrRef_t msg,cStrRef_t m2="",cStrRef_t m3="",cStrRef_t m4="",cStrRef_t m5="");
+void invalid_xml(const string &m1,
+                 const string &m2="",
+                 const string &m3="",
+                 const string &m4="",
+                 const string &m5="");
 
-string load_xml    (cStrRef_t src);
-string cleanup_xml (cStrRef_t xml);
+string load_xml    (const string &src);
+string cleanup_xml (const string &xml);
 
-bool   is_bracket   (cStrRef_t s, size_t pos);
-bool   has_content  (cStrRef_t s);
+bool   is_bracket   (const string &s, size_t pos);
+bool   has_content  (const string &s);
 
-bool   read_double  (cStrRef_t s, double &dval,  string &tail);
-bool   read_integer (cStrRef_t s, long   &ival,  string &tail);
-bool   read_token   (cStrRef_t s, string &token, string &tail);
+bool   read_double  (const string &s, double &dval,  string &tail);
+bool   read_integer (const string &s, long   &ival,  string &tail);
+bool   read_token   (const string &s, string &token, string &tail);
 
-bool   read_element (cStrRef_t s, string &key, Attributes_t &, string &body, string &tail);
-size_t read_attr    (cStrRef_t s, size_t pos,string &attr_key,string &attr_value);
+bool   read_element (const string &s, string &key, Attributes_t &, string &body, string &tail);
+bool   read_attr    (const string &s, string &key, string &value, string &tail);
 
-Node_t *build_node(cStrRef_t &xml, const ArgDefs &, string &tail); // modifies xml
+Op_t *build_op(const string &xml, const ArgDefs &, string &tail); // modifies xml
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +58,7 @@ class ArgDefs
   public:
     ArgDefs(void) {}
 
-    void add(NumberType_t type, cStrRef_t name="")
+    void add(NumberType_t type, const string &name="")
     {
       if(name.empty()==false) xref_[name] = int(types_.size());
       types_.push_back(type);
@@ -64,14 +67,14 @@ class ArgDefs
     int          size(void)  const { return int(types_.size()); }
     NumberType_t type(int i) const { return types_.at(i);  }
 
-    int index(cStrRef_t name) const
+    int index(const string &name) const
     {
       NameXref_t::const_iterator i = xref_.find(name);
       if( i == xref_.end() ) invalid_xml("Bad argument name (",name,")");
       return i->second;
     }
 
-    int lookup(cStrRef_t name) const
+    int lookup(const string &name) const
     {
       NameXref_t::const_iterator i = xref_.find(name);
       return (i==xref_.end() ? -1 : i->second );
@@ -85,161 +88,135 @@ class ArgDefs
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// XMLFunc::Node subclasses
+// XMLFunc::Op subclasses
 ////////////////////////////////////////////////////////////////////////////////
 
-class ConstNode : public Node_t
+class ConstOp : public Op_t
 {
   public:
-    ConstNode(const Attributes_t &, cStrRef_t body, const ArgDefs &, NumberType_t);
-    ConstNode(long v)   : value_(v) {}
-    ConstNode(double v) : value_(v) {}
+    ConstOp(const Attributes_t &, const string &body, const ArgDefs &, NumberType_t);
+    ConstOp(long v)   : value_(v) {}
+    ConstOp(double v) : value_(v) {}
     Number_t eval(const Args_t &args) const { return value_; }
   private:
     Number_t value_;
 };
 
-class ArgNode : public Node_t
+class ArgOp : public Op_t
 {
   public:
-    ArgNode(const Attributes_t &, cStrRef_t body, const ArgDefs &);
-    ArgNode(size_t i) : index_(i) {}
+    ArgOp(const Attributes_t &, const string &body, const ArgDefs &);
+    ArgOp(size_t i) : index_(i) {}
     Number_t eval(const Args_t &args) const { return args.at(index_); }
   private:
     size_t index_;
 };
 
 
-class UnaryNode : public Node_t
+class UnaryOp : public Op_t
 {
   public:
-    UnaryNode(const Attributes_t &, cStrRef_t body, const ArgDefs &);
-
-    ~UnaryNode() { if(op_!=NULL) delete op_; }
-
+    UnaryOp(const Attributes_t &, const string &body, const ArgDefs &);
+    ~UnaryOp() { if(op_!=NULL) delete op_; }
   protected:
-    Node_t *op_;
+    Op_t *op_;
 };
 
-class BinaryNode : public Node_t
+class BinaryOp : public Op_t
 {
   public:
-    BinaryNode(const Attributes_t &, cStrRef_t body, const ArgDefs &);
-
-    ~BinaryNode() 
-    { 
-      if(op1_!=NULL) delete op1_;
-      if(op2_!=NULL) delete op2_;
-    }
-
+    BinaryOp(const Attributes_t &, const string &body, const ArgDefs &);
+    ~BinaryOp() { if(op1_!=NULL) delete op1_; if(op2_!=NULL) delete op2_; }
   protected:
-    Node_t *op1_;
-    Node_t *op2_;
+    Op_t *op1_;
+    Op_t *op2_;
 };
 
-class ListNode : public Node_t
+class ListOp : public Op_t
 {
   public:
-    ListNode(const Attributes_t &, cStrRef_t body, const ArgDefs &);
-
-    ~ListNode() 
-    { 
-      for(vector<Node_t *>::iterator i=ops_.begin(); i!=ops_.end(); ++i) delete *i;
-    }
-
+    ListOp(const Attributes_t &, const string &body, const ArgDefs &);
+    ~ListOp() 
+    { for(vector<Op_t *>::iterator i=ops_.begin(); i!=ops_.end(); ++i) delete *i; }
   protected:
-    vector<Node_t *> ops_;
+    vector<Op_t *> ops_;
 };
 
-class NegNode : public UnaryNode
+class NegOp : public UnaryOp
 {
   public:
-    NegNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    NegOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return op_->eval(args).negate();
-    }
+    { return op_->eval(args).negate(); }
 };
 
-class SinNode : public UnaryNode
+class SinOp : public UnaryOp
 {
   public: 
-    SinNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    SinOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return sin(double(op_->eval(args)));
-    }
+    { return sin(double(op_->eval(args))); }
 };
 
-class CosNode : public UnaryNode
+class CosOp : public UnaryOp
 {
   public:
-    CosNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    CosOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return cos(double(op_->eval(args)));
-    }
+    { return cos(double(op_->eval(args))); }
 };
 
-class TanNode : public UnaryNode
+class TanOp : public UnaryOp
 {
   public:
-    TanNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    TanOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return tan(double(op_->eval(args)));
-    }
+    { return tan(double(op_->eval(args))); }
 };
 
-class AsinNode : public UnaryNode
+class AsinOp : public UnaryOp
 {
   public:
-    AsinNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    AsinOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return asin(double(op_->eval(args)));
-    }
+    { return asin(double(op_->eval(args))); }
 };
 
-class AcosNode : public UnaryNode
+class AcosOp : public UnaryOp
 {
   public:
-    AcosNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    AcosOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return acos(double(op_->eval(args)));
-    }
+    { return acos(double(op_->eval(args))); }
 };
 
-class AtanNode : public UnaryNode
+class AtanOp : public UnaryOp
 {
   public:
-    AtanNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    AtanOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return atan(double(op_->eval(args)));
-    }
+    { return atan(double(op_->eval(args))); }
 };
 
-class DegNode : public UnaryNode
+class DegOp : public UnaryOp
 {
   public: 
-    DegNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    DegOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     {
@@ -248,11 +225,11 @@ class DegNode : public UnaryNode
     }
 };
 
-class RadNode : public UnaryNode
+class RadOp : public UnaryOp
 {
   public:
-    RadNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    RadOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     {
@@ -261,58 +238,50 @@ class RadNode : public UnaryNode
     }
 };
 
-class AbsNode : public UnaryNode
+class AbsOp : public UnaryOp
 {
   public:
-    AbsNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    AbsOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return op_->eval(args).abs();
-    }
+    { return op_->eval(args).abs(); }
 };
 
-class SqrtNode : public UnaryNode
+class SqrtOp : public UnaryOp
 {
   public:
-    SqrtNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    SqrtOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return Number_t( sqrt(double(op_->eval(args))) );
-    }
+    { return Number_t( sqrt(double(op_->eval(args))) ); }
 };
 
-class ExpNode : public UnaryNode
+class ExpOp : public UnaryOp
 {
   public:
-    ExpNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    ExpOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return Number_t( exp(double(op_->eval(args))) );
-    }
+    { return Number_t( exp(double(op_->eval(args))) ); }
 };
 
-class LnNode : public UnaryNode
+class LnOp : public UnaryOp
 {
   public: 
-    LnNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : UnaryNode(attr,body,argDefs) {}
+    LnOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : UnaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const
-    {
-      return Number_t( log(double(op_->eval(args))) );
-    }
+    { return Number_t( log(double(op_->eval(args))) ); }
 };
 
-class LogNode : public UnaryNode
+class LogOp : public UnaryOp
 {
   public:
-    LogNode(const Attributes_t &, cStrRef_t body, const ArgDefs &);
+    LogOp(const Attributes_t &, const string &body, const ArgDefs &);
     Number_t eval(const Args_t &args) const
     {
       return Number_t( fac_ * log( double(op_->eval(args))) );
@@ -321,70 +290,68 @@ class LogNode : public UnaryNode
     double fac_;
 };
 
-class SubNode : public BinaryNode
+class SubOp : public BinaryOp
 {
   public: 
-    SubNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : BinaryNode(attr,body,argDefs) {}
+    SubOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : BinaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
 
-class DivNode : public BinaryNode
+class DivOp : public BinaryOp
 {
   public: 
-    DivNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : BinaryNode(attr,body,argDefs) {}
+    DivOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : BinaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
 
-class PowNode : public BinaryNode
+class PowOp : public BinaryOp
 {
   public: 
-    PowNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : BinaryNode(attr,body,argDefs) {}
+    PowOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : BinaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
 
-class ModNode : public BinaryNode
+class ModOp : public BinaryOp
 {
   public: 
-    ModNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : BinaryNode(attr,body,argDefs) {}
+    ModOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : BinaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
 
-class Atan2Node : public BinaryNode
+class Atan2Op : public BinaryOp
 {
   public: 
-    Atan2Node(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : BinaryNode(attr,body,argDefs) {}
+    Atan2Op(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : BinaryOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
 
-class AddNode : public ListNode
+class AddOp : public ListOp
 {
   public: 
-    AddNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : ListNode(attr,body,argDefs) {}
+    AddOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : ListOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
 
-class MultNode : public ListNode
+class MultOp : public ListOp
 {
   public: 
-    MultNode(const Attributes_t &attr,cStrRef_t body, const ArgDefs &argDefs)
-      : ListNode(attr,body,argDefs) {}
+    MultOp(const Attributes_t &attr,const string &body, const ArgDefs &argDefs)
+      : ListOp(attr,body,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
-
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // XMLFunc methods
@@ -392,7 +359,7 @@ class MultNode : public ListNode
 
 // XMLFunc constructor
 
-XMLFunc::XMLFunc(cStrRef_t src) : root_(NULL), numArgs_(0)
+XMLFunc::XMLFunc(const string &src) : root_(NULL), numArgs_(0)
 {
   string xml = cleanup_xml( load_xml(src) );
 
@@ -436,10 +403,10 @@ XMLFunc::XMLFunc(cStrRef_t src) : root_(NULL), numArgs_(0)
     else                 { argDefs.add(type); }
   }
 
-  // Build the root evaluation node
+  // Build the root evaluation operation
 
   string extra;
-  root_ = build_node(func,argDefs,extra);
+  root_ = build_op(func,argDefs,extra);
 
   if( root_ == NULL )      invalid_xml("missing valid root value element");
   if( has_content(extra) ) invalid_xml("only one root value element allowed");
@@ -475,10 +442,10 @@ Number_t XMLFunc::eval(const Number_t *argArray) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// XMLFunc::Node subclass methods
+// XMLFunc::Op subclass methods
 ////////////////////////////////////////////////////////////////////////////////
 
-ConstNode::ConstNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs, NumberType_t type)
+ConstOp::ConstOp(const Attributes_t &attr, const string &body, const ArgDefs &argDefs, NumberType_t type)
 {
   string value_str;
 
@@ -487,10 +454,10 @@ ConstNode::ConstNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &ar
   bool hasValue = ( ai != attr.end() );
   bool hasBody  = has_content(body);
 
-  if( hasValue && hasBody ) invalid_xml("Const node cannot contain both value attribute and a body");
+  if( hasValue && hasBody ) invalid_xml("Const op cannot contain both value attribute and a body");
   else if (hasValue)        value_str = ai->second; 
   else if (hasBody)         value_str = body;
-  else                      invalid_xml("Const node must contain either value attribute or a body");
+  else                      invalid_xml("Const op must contain either value attribute or a body");
 
   string extra;
   if(type == Number_t::Double)
@@ -505,11 +472,11 @@ ConstNode::ConstNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &ar
     if( ! read_integer( value_str, ival, extra ) ) invalid_xml("Invalid integer value (",value_str,")");
     value_ = Number_t(ival);
   }
-  if( has_content(extra) )                       invalid_xml("Extraneous data (",extra,") following ",value_str);
+  if( has_content(extra) ) invalid_xml("Extraneous data (",extra,") following ",value_str);
 }
 
 
-ArgNode::ArgNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
+ArgOp::ArgOp(const Attributes_t &attr, const string &body, const ArgDefs &argDefs)
 {
   Attributes_t::const_iterator index_iter = attr.find("index");
   Attributes_t::const_iterator name_iter  = attr.find("name");
@@ -520,8 +487,8 @@ ArgNode::ArgNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDef
 
   int n = (hasIndex?1:0) + (hasName?1:0) + (hasBody?1:0);
 
-  if(n > 1) invalid_xml("Arg node may only contain one of value attribute, index attribute, or body");
-  if(n < 1) invalid_xml("Arg node must contain one of value attribute, index attribute, or body");
+  if(n > 1) invalid_xml("Arg op may only contain one of value attribute, index attribute, or body");
+  if(n < 1) invalid_xml("Arg op must contain one of value attribute, index attribute, or body");
 
   long index;
   string name;
@@ -583,61 +550,106 @@ ArgNode::ArgNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDef
 }
 
 
-UnaryNode::UnaryNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
+UnaryOp::UnaryOp(const Attributes_t &attr, const string &body, const ArgDefs &argDefs)
+  : op_(NULL);
 {
-  string arg_str;
-
   Attributes_t::const_iterator ai = attr.find("arg");
-
-  bool hasAttr = ai != attr.end();
-  bool hasBody  = has_content(body);
-
-  if( hasAttr && hasBody ) invalid_xml("Unary node cannot contain both arg attribute and a body");
-  else if (hasAttr)        arg_str = ai->second; 
-  else if (hasBody)        arg_str = body;
-  else                     invalid_xml("Unary node must contain either arg attribute or a body");
-
-  string token;
-  string tail;
-  if( read_token(arg_str,token,tail) == false ) invalid_xml("Unary node arg is empty");
-
-  long   ival;
-  double dval;
-  int    index;
-  string extra;
-  if( token[0] == '<' )
+  if( ai != attr.end() )
   {
-    _op = build_node(arg_str,argDefs);
+    string extra;
+    op_ = build_op(ai->second, argDefs, extra);
+    if( has_content(extra) ) invalid_xml("Extraneous arg data found");
   }
-  else if( string_to_integer( token, ival, extra ) )
+  else if( has_content(body) )
   {
-    _op = new ConstNode(ival);
+    op_ = build_op(body, argDefs, body);
   }
-  else if( string_to_double( token, ival, extra ) )
+  else
   {
-    _op = new ConstNode(dval);
+    invalid_xml("Missing argument data");
   }
-  else if( ( index = argDefs.lookup(token) ) >= 0 )
-  {
-    _op = new ArgNode(index);
-  }
-  
+  if(op_==NULL) invalid_xml("Failed to parse arg data");
+
+  if(has_content(body)) invalid_xml("Extraneous argument data found");
 }
 
-BinaryNode::BinaryNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
+BinaryOp::BinaryOp(const Attributes_t &attr, const string &body, const ArgDefs &argDefs)
+  : op1_(NULL), op2_(NULL)
 {
+  Attributes_t::const_iterator ai = attr.find("arg1");
+  if( ai != attr.end() )
+  {
+    string extra;
+    op1_ = build_op(ai->second, argDefs, extra);
+    if(has_content(extra)) invalid_xml("Extraneous arg1 data found");
+  }
+  else if( has_content(body) )
+  {
+    op1_ = build_op(body, argDefs, body);
+  }
+  else
+  {
+    invalid_xml("Missing argument data");
+  }
+  if(op1_==NULL) invalid_xml("Failed to parse arg1 data");
+
+  ai = attr.find("arg2");
+  if( ai != attr.end() )
+  {
+    string extra;
+    op2_ = build_op(ai->second, argDefs, extra);
+    if(has_content(extra)) invalid_xml("Extraneous arg2 data found");
+  }
+  else if( has_content(body) )
+  {
+    op2_ = build_op(body, argDefs, body);
+  }
+  else
+  {
+    invalid_xml("Missing second argument data");
+  }
+  if(op2_==NULL) invalid_xml("Failed to parse arg1 data");
+
+  if(has_content(body)) invalid_xml("Extraneous argument data found");
 }
 
-ListNode::ListNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
+ListOp::ListOp(const Attributes_t &attr, const string &body, const ArgDefs &argDefs)
 {
+  while(has_content(body))
+  {
+    Op_t *op = build_op(body,argDefs,body);
+    if( op == NULL ) 
+    {
+      stringstream err;
+      err << "Failed to parse arg" << ops_.length() << " data";
+      invalid_xml(err.str());
+    }
+    ops_.push_back(op);
+  }
+  if(ops_.empty()) invalid_xml("Missing argument data");
 }
 
-LogNode::LogNode(const Attributes_t &attr, cStrRef_t body, const ArgDefs &argDefs)
-  : UnaryNode(attr,body,argDefs)
+LogOp::LogOp(const Attributes_t &attr, const string &body, const ArgDefs &argDefs)
+  : UnaryOp(attr,body,argDefs)
 {
+  double base(10.);
+
+  Attributes_t::const_iterator ai = attr.find("base");
+  if( ai != attr.end() )
+  {
+    string extra;
+    if( read_double(ai->second, base, extra) == false ) 
+      invalid_xml("Invalid base value (",ai->second,") for log");
+    if( has_content(extra) )
+      invalid_xml("Extraneous data found for base value");
+    if(base <= 0.)
+      invalid_xml("Base for log must be a positive value");
+  }
+
+  fac_ = 1. / log(base);
 }
 
-Number_t SubNode::eval(const Args_t &args) const
+Number_t SubOp::eval(const Args_t &args) const
 {
   Number_t v1 = op1_->eval(args);
   Number_t v2 = op2_->eval(args);
@@ -648,7 +660,7 @@ Number_t SubNode::eval(const Args_t &args) const
     : Number_t( double(v1) - double(v2) ) ;
 }
 
-Number_t DivNode::eval(const Args_t &args) const
+Number_t DivOp::eval(const Args_t &args) const
 {
   Number_t v1 = op1_->eval(args);
   Number_t v2 = op2_->eval(args);
@@ -659,7 +671,7 @@ Number_t DivNode::eval(const Args_t &args) const
     : Number_t( double(v1) / double(v2) ) ;
 }
 
-Number_t PowNode::eval(const Args_t &args) const
+Number_t PowOp::eval(const Args_t &args) const
 {
   Number_t v1 = op1_->eval(args);
   Number_t v2 = op2_->eval(args);
@@ -667,7 +679,7 @@ Number_t PowNode::eval(const Args_t &args) const
   return Number_t( pow( double(v1), double(v2) ) );
 }
 
-Number_t ModNode::eval(const Args_t &args) const
+Number_t ModOp::eval(const Args_t &args) const
 {
   Number_t v1 = op1_->eval(args);
   Number_t v2 = op2_->eval(args);
@@ -678,7 +690,7 @@ Number_t ModNode::eval(const Args_t &args) const
   : Number_t( std::fmod(double(v1),double(v2)) ) ;
 }
 
-Number_t Atan2Node::eval(const Args_t &args) const
+Number_t Atan2Op::eval(const Args_t &args) const
 {
   Number_t v1 = op1_->eval(args);
   Number_t v2 = op2_->eval(args);
@@ -686,14 +698,14 @@ Number_t Atan2Node::eval(const Args_t &args) const
   return Number_t( atan2( double(v1), double(v2) ) );
 }
 
-Number_t AddNode::eval(const Args_t &args) const
+Number_t AddOp::eval(const Args_t &args) const
 {
   long   isum(0);
   double dsum(0.);
 
   bool isInteger = true;
 
-  for(vector<Node_t *>::const_iterator op=ops_.begin(); op!=ops_.end(); ++op)
+  for(vector<Op_t *>::const_iterator op=ops_.begin(); op!=ops_.end(); ++op)
   {
     Number_t t = (*op)->eval(args);
 
@@ -706,14 +718,14 @@ Number_t AddNode::eval(const Args_t &args) const
   return isInteger ? Number_t(isum) : Number_t(dsum);
 }
 
-Number_t MultNode::eval(const Args_t &args) const
+Number_t MultOp::eval(const Args_t &args) const
 {
   long   iprod(1);
   double dprod(1.);
 
   bool isInteger = true;
 
-  for(vector<Node_t *>::const_iterator op = ops_.begin(); op != ops_.end(); ++op)
+  for(vector<Op_t *>::const_iterator op = ops_.begin(); op != ops_.end(); ++op)
   {
     Number_t t = (*op)->eval(args);
 
@@ -730,7 +742,7 @@ Number_t MultNode::eval(const Args_t &args) const
 // Support functions
 ////////////////////////////////////////////////////////////////////////////////
 
-void invalid_xml(cStrRef_t msg,cStrRef_t m2,cStrRef_t m3,cStrRef_t m4,cStrRef_t m5) 
+void invalid_xml(const string &msg,const string &m2,const string &m3,const string &m4,const string &m5) 
 {
   string err = "Invalid XMLFunc: ";
   err.append(msg);
@@ -741,7 +753,7 @@ void invalid_xml(cStrRef_t msg,cStrRef_t m2,cStrRef_t m3,cStrRef_t m4,cStrRef_t 
   throw runtime_error(err + msg);
 }
 
-bool is_bracket(cStrRef_t xml, size_t pos)
+bool is_bracket(const string &xml, size_t pos)
 {
   char c = xml.at(pos);
   if( c=='<' || c=='>' ) return true;
@@ -754,7 +766,7 @@ bool is_bracket(cStrRef_t xml, size_t pos)
 //   If the latter, it simply returns the source string.
 // Yes, there is a huge assumption here... but if the file does not actually
 //   contain XML, it will be caught shortly.
-string load_xml(cStrRef_t src)
+string load_xml(const string &src)
 {
   // Assume src contains a filename and attempt to open it.
   //   If it fails, then assume src is the xml string and return it.
@@ -772,7 +784,7 @@ string load_xml(cStrRef_t src)
 
 
 // Removes XML declaration and comments from XML
-string cleanup_xml(cStrRef_t orig_xml)
+string cleanup_xml(const string &orig_xml)
 {
   const string decl_start    = "<?xml";
   const string decl_end      = "?>";
@@ -795,7 +807,7 @@ string cleanup_xml(cStrRef_t orig_xml)
   bool   del_ws   = true;   // remove leading whitespace
   size_t start_ws = 0;
 
-  for(size_t pos = 0; pos<xml.length(); ++pos)
+  for(size_t pos=0; pos<xml.length(); ++pos)
   {
     char c = xml[pos];
 
@@ -834,18 +846,15 @@ string cleanup_xml(cStrRef_t orig_xml)
       del_ws = isBracket;
     }
   }
-  if( in_ws )
-  {
-    // remove trailing whitespace
-    xml.erase(start_ws);
-  }
+
+  if(in_ws) xml.erase(start_ws);  // remove trailing whitespace
 
   // remove XML prolog(s)
   //   should only be one, but removes all just in case
   //
   // Note that this is not a completely robust search.
   //   If there is an <?xml or ?> buried within quotes,
-  //   that will probablby cause issues...
+  //   that will probably cause issues...
 
   while(true)
   {
@@ -860,8 +869,8 @@ string cleanup_xml(cStrRef_t orig_xml)
 
   // remove comments
   //
-  // Again, f there is an <?-- or --> buried within quotes,
-  //   that will probablby cause issues...
+  // Again, if there is an <?-- or --> buried within quotes,
+  //   that will probably cause issues...
   
   while(true)
   {
@@ -880,7 +889,7 @@ string cleanup_xml(cStrRef_t orig_xml)
 
 // Finds the next tag in the XML and returns its key, attributes, and body.
 //   Returns the remaining XML string after removing the current element
-bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, string &tail)
+bool read_element(const string &xml, string &key, Attributes_t &attr, string &body, string &tail)
 {
   key = "";
   body = "";
@@ -892,14 +901,120 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
   while(pos<end && isspace(xml[pos])) ++pos;
   if(pos==end)      return false;
   if(xml[pos]!='<') return false;
+  
+  if(pos+1<end && xml[pos+1]=='/') invalid_xml("Cannot start element with closing tag");
 
-  const size_t start_elem = pos;
+  size_t elem_start = pos;
+  size_t elem_end(0);
+
+  size_t attr_start(0);
+  size_t attr_end(0);
+
+  size_t body_start(0);
+  size_t body_end(0);
+
+  bool in_tag(true);
+  bool in_closing_tag(false);
+  bool in_key(false);
+
+  char q='\0';
+
+  vector<string> keys;
+
+  for( ++pos ; pos<end ; ++pos )
+  {
+    char c = xml[pos];
+
+    if(q) //currently in quoted text
+    {
+      if(c==q) q = '\0'; // closing quote found, exit quote
+    }
+    else if(c=='\'' || c=='"') // enter quote
+    {
+      q = c; // set quote type
+    }
+    else if(in_tag)
+    {
+      if(c=='<')
+      {
+        invalid_xml("Extraneous '<' found inside tag");
+      }
+      else if(c=='/')
+      {
+        if(pos+1 < end && xml[pos+1]=='>') // bodyless tag
+        {
+          if( in_closing_tag ) invalid_xml("Tag cannot start with </ and end with />");
+
+          in_tag = in_closing_tag = false;
+          key = keys.back();
+          keys.pop_back();
+
+          if(keys.empty()) 
+          { 
+            attr_end = pos-1;
+            pos+=2; 
+            break; 
+          }
+        }
+        else
+        {
+          invalid_xml("Extraneous '/' found inside tag");
+        }
+      }
+      else if(c=='>')
+      {
+      }
+    }
+    else // in body
+    {
+      if(c=='>')
+      {
+        invalid_xml("Extraneous '>' found outside XML tag");
+      }
+      if(c=='<') // entering tag
+      {
+        in_tag = true;
+
+        if( pos+1 < end && xml[pos+1]=='/' ) // </ => closing tag
+        {
+          ++pos;
+          in_closing_tag = true;
+
+          // validate key
+          key = keys.back();
+          keys.pop_back();
+          if( xml.compare(pos+1,key.size(),key) != 0 )
+            invalid_xml("Incorrectly nexted tags, missing closing tag for <",key,">");
+
+          if(keys.empty()) body_end = pos-1;
+        }
+        else // opening or body-less tag
+        {
+          size_t key_start = ++pos;
+          while(pos<end && isalpha(xml[pos]) ) ++pos;
+          if( pos==end ) invalid_xml("Incomplete opening tag");
+          if( pos==key_start) invalid_xml("Opening tag is missing key");
+
+          if(keys.empty()) attr_start = pos;
+
+          key = xml.substr(key_start,pos-key_start);
+          keys.push_back(key) ;
+          --pos;
+        }
+      }
+    }
+  }
+
+
+
+
+  }
 
   // determine the key for this element
 
   const size_t start_key = ++pos;
 
-  while(pos<end && !isspace(xml[pos]) && !is_bracket(xml,pos)) +pos;
+  while(pos<end && !isspace(xml[pos]) && !is_bracket(xml,pos)) ++pos;
   if(pos==end) return false;
 
   key = xml.substr(start_key,pos-start_key);
@@ -911,7 +1026,10 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
   //   - finding '>'  indicates an opening tag: while loop is exited with a break;
   //   - finding neither: the loop exits when it runs out of string to parse (an exception will be thrown)
 
+  size_t attr_start(pos);
   size_t body_start(0);
+
+  char q='\0';
 
   while( pos<end )
   {
@@ -920,27 +1038,23 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
     if(c=='>')
     {
       // This is a tag with a body (i.e. <key...>[...]</key>
-      //   We will need to extract that as our next step
-
+      attr_end   = pos-1;
       body_start = ++pos;
       break;
     }
     else if(c=='/')
     {
-      // This is an empty-element tag (i.e. <key .... />)
-      //   There is no body.
-      //   We can return immediately
+      // This is an empty-element tag (i.e. <key .... />), i.e. no body
       if(pos==end-1 || xml[pos+1] != '>') invalid_xml("Missing closing '>' for ",key);
 
-      // We can return immediately after stripping out current tag
-      tail = xml.substr(pos+2);
-      return true;
+      attr_end = pos-1;
+      break;
     }
     else if( isalpha(c) )
     {
       string attr_key;
       string attr_value;
-      pos = read_next_attr(xml,pos,attr_key,attr_value); // advances pos
+      read_next_attr(xml,pos,attr_key,attr_value); // advances pos
 
       if(attr_key.empty())
         invalid_xml("Failed to parse attributes for <",key,">");
@@ -1041,80 +1155,90 @@ bool read_element(cStrRef_t xml, string &key, Attributes_t &attr, string &body, 
   return true;
 }
 
-size_t read_next_attr(cStrRef_t xml,size_t pos,string &attr_key,string &attr_value)
+bool read_attr(const string &xml,string &key,string &value, string &tail)
 {
-  size_t rval = pos;
+  if(has_content(xml)==false) return false;
 
-  attr_key = "";
-  attr_value = "";
-
-  size_t start_key(0);
-  size_t end_key(0);
-  size_t start_value(0);
-  size_t end_value(0);
+  key = "";
+  value = "";
 
   size_t end = xml.length();
+  
+  size_t start_key(0);
+  while( start_key<end && isspace(xml[start_key]) ) ++start_key;
 
-  // skip over leading whitespace (should not see any)
-  while(pos<end && isspace(xml[pos])) ++pos;
-  if(pos==end) return rval;
+  if(start_key == end) return false;
+  if(isalpha(xml[start_key])==false) invalid_xml("attribute keys must start with a roman letter");
 
-  // find the key string
+  size_t end_key = start_key;
+  while( end_key<end && isalnum(xml[end_key]) ) ++end_key;
 
-  if( isalpha(xml[pos]) == false ) return rval; // must start with alpha
-  start_key = pos;
+  if(end_key == end ) invalid_xml("attribute is missing value");
 
-  while(pos<end && isalnum(xml[pos])) ++pos;
-  if(pos==end) return rval;
-  end_key = pos;
+  size_t start_value = end_key;
+  while( start_value<end && isspace(xml[start_value]) ) ++start_value;
+  if( start_value == end || xml[start_value] != '=' ) invalid_xml("attribute is missing '='");
+  ++start_value;
+  while( start_value<pos && isspace(xml[start_value]) ) ++start_value;
+  if( start_value == end ) invalid_xml("attribute is missing value");
+  
+  char q = xml[start_value];
+  if( q != '\'' && q != '"' ) invalid_xml("attribute value must be in quotes");
+  ++start_value;
 
-  while(pos<end && isspace(xml[pos])) ++pos;  // skip over whitespace
-  if(pos==end) return rval;
+  size_t end_value = start_value;
+  while( end_value<end && xml[end_value] != q ) ++end_value;
+  if( end_value == end ) invalid_xml("attribute value is missing closing quote");
 
-  // verify the equal sign and step over
+  key = xml.substr(start_key, end_key-start_key);
+  value = xml.substr(start_value, end_value-start_value);
+  tail = xml.substr( end_value + 1 );
 
-  if( xml[pos++] != '=' ) return rval;
-  if(pos==end) return rval;
-
-  while(pos<end && isspace(xml[pos])) ++pos; // skip over whitespace
-  if(pos==end) return rval;
-
-  // verify/identify quote and step over
-
-  char q = xml[pos++];
-  if( q!='\'' && q!='"') return rval;
-  start_value = pos;
-
-  // find closing quote
-  while(pos<end && xml[pos] != q) ++pos;
-  if(pos==end) return rval;
-  end_value = pos;
-
-  attr_key   = xml.substr(start_key,   end_key   - start_key  );
-  attr_value = xml.substr(start_value, end_value - start_value);
-
-  transform(attr_key.begin(),attr_key.end(),attr_key.begin(),::tolower);
-  transform(attr_value.begin(),attr_value.end(),attr_value.begin(),::tolower);
-
-  return ++pos;  // step past closing quote
+  return true;
 }
 
-Node_t *build_node(cStrRef_t &xml, const ArgDefs &argDefs, string &tail)
+Op_t *build_op(const string &&xml, const ArgDefs &argDefs, string &tail)
 {
-  Node_t *rval=NULL;
+  Op_t *rval=NULL;
 
-  // first check that the input is not empty
+  // get the first token off of the XML string
+  //   return NULL if none is found
 
-  if( has_content(xml) == false ) return NULL;
-
-  // next check to see if the string is actually a numeric value or argument name
-  
-  bool rc = 
   string token;
-  string junk;
-  if( read_token(arg_str,token,junk) == false ) invalid_xml("Unary node arg is empty");
+  string tail;
 
-  // next check to see if the string starts with a tag
+  if( read_token(xml,token,tail) == false ) return NULL;
+
+  // if token does not start with '<' (aka is not a tag), look to see if
+  //   it is either a numeric value or argument name
+
+  if( token[0] != '<' )
+  {
+    string extra;
+
+    long ival;
+    if( read_integer( token, ival, extra ) )
+    {
+      if(has_content(extra)) 
+        invalid_xml("Extraneous data found after integer value (",extra,")");
+
+      return new ConstOp(ival);
+    }
+
+    double dval;
+    if( read_double( token, dval, extra ) )
+    {
+      if(has_content(extra)) 
+        invalid_xml("Extraneous data found after double value (",extra,")");
+
+      return new ConstOp(dval);
+    }
+
+    int index = argDefs.lookup(token);
+    if( index < 0 ) invalid_xml("Unrecognized argument name (",token,")");
+
+    return new ArgOp(index);
+  }
 
   // good to go to parse XML
 
@@ -1122,35 +1246,35 @@ Node_t *build_node(cStrRef_t &xml, const ArgDefs &argDefs, string &tail)
   Attributes_t attr;
   string body="";
 
-  xml = read_element(xml,key,attr,body);
+  if( read_element(xml,key,attr,body,tail) == false ) return NULL;
 
-  if      ( key == "double"  ) { rval = new ConstNode( attr,body,argDefs, Number_t::Double  ); }
-  else if ( key == "float"   ) { rval = new ConstNode( attr,body,argDefs, Number_t::Double  ); }
-  else if ( key == "real"    ) { rval = new ConstNode( attr,body,argDefs, Number_t::Double  ); }
-  else if ( key == "integer" ) { rval = new ConstNode( attr,body,argDefs, Number_t::Integer ); }
-  else if ( key == "int"     ) { rval = new ConstNode( attr,body,argDefs, Number_t::Integer ); }
-  else if ( key == "arg"     ) { rval = new   ArgNode( attr,body,argDefs ); }
-  else if ( key == "neg"     ) { rval = new   NegNode( attr,body,argDefs ); }
-  else if ( key == "sin"     ) { rval = new   SinNode( attr,body,argDefs ); }
-  else if ( key == "cos"     ) { rval = new   CosNode( attr,body,argDefs ); }
-  else if ( key == "tan"     ) { rval = new   TanNode( attr,body,argDefs ); }
-  else if ( key == "asin"    ) { rval = new  AsinNode( attr,body,argDefs ); }
-  else if ( key == "acos"    ) { rval = new  AcosNode( attr,body,argDefs ); }
-  else if ( key == "atan"    ) { rval = new  AtanNode( attr,body,argDefs ); }
-  else if ( key == "deg"     ) { rval = new   DegNode( attr,body,argDefs ); }
-  else if ( key == "rad"     ) { rval = new   RadNode( attr,body,argDefs ); }
-  else if ( key == "abs"     ) { rval = new   AbsNode( attr,body,argDefs ); }
-  else if ( key == "sqrt"    ) { rval = new  SqrtNode( attr,body,argDefs ); }
-  else if ( key == "exp"     ) { rval = new   ExpNode( attr,body,argDefs ); }
-  else if ( key == "ln"      ) { rval = new    LnNode( attr,body,argDefs ); }
-  else if ( key == "log"     ) { rval = new   LogNode( attr,body,argDefs ); }
-  else if ( key == "sub"     ) { rval = new   SubNode( attr,body,argDefs ); }
-  else if ( key == "div"     ) { rval = new   DivNode( attr,body,argDefs ); }
-  else if ( key == "pow"     ) { rval = new   PowNode( attr,body,argDefs ); }
-  else if ( key == "mod"     ) { rval = new   ModNode( attr,body,argDefs ); }
-  else if ( key == "atan2"   ) { rval = new Atan2Node( attr,body,argDefs ); }
-  else if ( key == "add"     ) { rval = new   AddNode( attr,body,argDefs ); }
-  else if ( key == "mult"    ) { rval = new  MultNode( attr,body,argDefs ); }
+  if      ( key == "double"  ) { rval = new ConstOp( attr,body,argDefs, Number_t::Double  ); }
+  else if ( key == "float"   ) { rval = new ConstOp( attr,body,argDefs, Number_t::Double  ); }
+  else if ( key == "real"    ) { rval = new ConstOp( attr,body,argDefs, Number_t::Double  ); }
+  else if ( key == "integer" ) { rval = new ConstOp( attr,body,argDefs, Number_t::Integer ); }
+  else if ( key == "int"     ) { rval = new ConstOp( attr,body,argDefs, Number_t::Integer ); }
+  else if ( key == "arg"     ) { rval = new   ArgOp( attr,body,argDefs ); }
+  else if ( key == "neg"     ) { rval = new   NegOp( attr,body,argDefs ); }
+  else if ( key == "sin"     ) { rval = new   SinOp( attr,body,argDefs ); }
+  else if ( key == "cos"     ) { rval = new   CosOp( attr,body,argDefs ); }
+  else if ( key == "tan"     ) { rval = new   TanOp( attr,body,argDefs ); }
+  else if ( key == "asin"    ) { rval = new  AsinOp( attr,body,argDefs ); }
+  else if ( key == "acos"    ) { rval = new  AcosOp( attr,body,argDefs ); }
+  else if ( key == "atan"    ) { rval = new  AtanOp( attr,body,argDefs ); }
+  else if ( key == "deg"     ) { rval = new   DegOp( attr,body,argDefs ); }
+  else if ( key == "rad"     ) { rval = new   RadOp( attr,body,argDefs ); }
+  else if ( key == "abs"     ) { rval = new   AbsOp( attr,body,argDefs ); }
+  else if ( key == "sqrt"    ) { rval = new  SqrtOp( attr,body,argDefs ); }
+  else if ( key == "exp"     ) { rval = new   ExpOp( attr,body,argDefs ); }
+  else if ( key == "ln"      ) { rval = new    LnOp( attr,body,argDefs ); }
+  else if ( key == "log"     ) { rval = new   LogOp( attr,body,argDefs ); }
+  else if ( key == "sub"     ) { rval = new   SubOp( attr,body,argDefs ); }
+  else if ( key == "div"     ) { rval = new   DivOp( attr,body,argDefs ); }
+  else if ( key == "pow"     ) { rval = new   PowOp( attr,body,argDefs ); }
+  else if ( key == "mod"     ) { rval = new   ModOp( attr,body,argDefs ); }
+  else if ( key == "atan2"   ) { rval = new Atan2Op( attr,body,argDefs ); }
+  else if ( key == "add"     ) { rval = new   AddOp( attr,body,argDefs ); }
+  else if ( key == "mult"    ) { rval = new  MultOp( attr,body,argDefs ); }
   else
   {
     invalid_xml("Unrecognized operator key (",key,")");
@@ -1160,7 +1284,7 @@ Node_t *build_node(cStrRef_t &xml, const ArgDefs &argDefs, string &tail)
 }
 
 // returns whether or not the string has something other than whitespace
-bool has_content(cStrRef_t s)
+bool has_content(const string &s)
 {
   for(size_t i=0; i<s.length() ++i)
   {
@@ -1172,7 +1296,7 @@ bool has_content(cStrRef_t s)
 // extracts the first token and attempts to interpret it as a double
 //   if succesful, true is returned and tail is set to the substring following the first token
 //   otherwise, false is returned and tail is set to the empty string
-bool read_double(cStrRef_t s, double &val, string &tail)
+bool read_double(const string &s, double &val, string &tail)
 {
   string token;
   if( read_token(s,token,tail) ) return false;
@@ -1190,7 +1314,7 @@ bool read_double(cStrRef_t s, double &val, string &tail)
 // extracts the first token and attempts to interpret it as a long integer
 //   if succesful, true is returned and tail is set to the substring following the first token
 //   otherwise, false is returned and tail is set to the empty string
-bool read_integer(cStrRef_t s, long &val, string &tail)
+bool read_integer(const string &s, long &val, string &tail)
 {
   string token;
   if( read_token(s,token,tail) ) return false;
@@ -1208,7 +1332,7 @@ bool read_integer(cStrRef_t s, long &val, string &tail)
 // extracts the first token from the input string
 //   returns true if one is found and sets tail to the following substring
 //   returns false if no token is found
-bool read_token(cStrRef_t s, string &token, string &tail)
+bool read_token(const string &s, string &token, string &tail)
 {
   token = "";
   tail  = "";
