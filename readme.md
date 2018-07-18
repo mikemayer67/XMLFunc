@@ -190,28 +190,28 @@ Argument elements reference one of the elements in the input array of values.
 #### Examples
 
 <pre>
-&lt;integer value="3"/>
-&lt;integer value="3.14159"/>   // INVALID
-&lt;double  value="3"/>
-&lt;double  value="3.14159"/><br>
-&lt;arg name="exponent"/>      // index=0
-&lt;arg index="1"/>            // name=base
+<integer value="3"/>
+<integer value="3.14159"/>   // INVALID
+<double  value="3"/>
+<double  value="3.14159"/><br>
+<arg name="exponent"/>      // index=0
+<arg index="1"/>            // name=base
 </pre>
 
 **Note**: most of the operator elements listed below are capable of taking input values
 directly via attributes. This will often be cleaner than creating input elements.
 
 <pre>
-&lt;add arg1="5" arg2="base"/>
+<add arg1="5" arg2="base"/>
 </pre>
 
 is easier to read than
 
 <pre>
-&lt;add>
-  &lt;integer value="5"/>
-  &lt;arg name="base"/>
-&lt;/add>
+<add>
+  <integer value="5"/>
+  <arg name="base"/>
+</add>
 </pre>
 
 ---
