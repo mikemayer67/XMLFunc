@@ -106,26 +106,26 @@ class XMLFunc
      */
     Number eval(const Args_t &args) const;
 
-  public: // making these public allows Op subclasses to exist outside XMLFunc scope
+  public: // making these public allows Operation subclasses to exist outside XMLFunc scope
 
     /*!
-     * \class XMLFunc::Op
+     * \class XMLFunc::Operation
      * \brief value node that performs a unary, binary, or list operation/function
      *
      * This is an abstract base class for all operator nodes.  There are a number of
      * built-in subclasses that perform most of the standard mathematical operations.
      * If additional subclasses are needed, code will need to be added in XMLFunc.cpp
      */
-    class Op
+    class Operation
     {
       /*!
        * The constructor is protected so that only subclasses can be instantiated
        */
       protected:
-        Op(void) {}
+        Operation(void) {}
 
       public:
-        virtual ~Op() {}
+        virtual ~Operation() {}
 
       /*!
        * Evaluates and returns the value of the element node as defined by the
@@ -146,8 +146,8 @@ class XMLFunc
     /// \cond PRIVATE
     ////////////////////////////////////////////////////////////
 
-    Op    *root_;
-    int    numArgs_;
+    Operation *root_;
+    size_t     numArgs_;
 
     /// \endcond
 };
