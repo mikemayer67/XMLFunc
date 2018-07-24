@@ -23,6 +23,8 @@ typedef Number_t::Type_t     NumberType_t;
 typedef XMLFunc::Operation   Op_t;
 typedef XMLFunc::Args_t      Args_t;
 
+class XMLNode;
+
 class ArgDefs;
 
 // prototypes for support functions
@@ -34,20 +36,18 @@ void invalid_xml(const string &err1,
                  const string &err5="");
 
 string load_xml     (const string &src);
-string cleanup_xml  (const string &xml);
-string strip_xml    (const string &xml, const string &start, const string &end)
+string strip_xml    (const string &xml, const string &start, const string &end);
 
-bool   is_bracket   (const string &s, size_t pos);
+size_t skip_whitespace(const string &xml,size_t pos=0);
+
 bool   has_content  (const string &s);
 
 bool   read_double  (const string &s, double &dval,  string &tail);
 bool   read_integer (const string &s, long   &ival,  string &tail);
 bool   read_token   (const string &s, string &token, string &tail);
 
-bool   read_element (const string &s, string &key, Attributes_t &, string &body, string &tail);
-bool   read_attr    (const string &s, string &key, string &value, string &tail);
-
-Op_t *build_op(const string &xml, const ArgDefs &, string &tail); // modifies xml
+Op_t *build_op(const string &arg,  const ArgDefs &);
+Op_t *build_op(const XMLNode *xml, const ArgDefs &);
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -90,7 +90,7 @@ class ArgDefs
 class XMLNode
 {
   public:
-    static XMLNode *build(string &xml);
+    static XMLNode *build(string &xml, XMLNode *parent=NULL);
 
     ~XMLNode()
     {
@@ -101,14 +101,14 @@ class XMLNode
     
     bool hasAttribute(const string &key) const
     {
-      return attributes_.find(key) != attribute_.end();
+      return attributes_.find(key) != attributes_.end();
     }
 
-    const string &attributeValue(const string &key) const
+    string attributeValue(const string &key) const
     {
       string rval;
-      Attribute_t::const_iter ai = attribute_.find(key);
-      if(ai != attribute_.end()) rval = ai->second;
+      Attributes_t::const_iterator ai = attributes_.find(key);
+      if(ai != attributes_.end()) rval = ai->second;
       return rval;
     }
 
@@ -116,17 +116,21 @@ class XMLNode
     bool   hasChildren(void) const { return ! children_.empty(); }
     size_t numChildren(void) const { return children_.size();    }
 
-    const Node *child(size_t i) const 
+    const XMLNode *child(size_t i) const
     {
-      Node *rval = NULL;
+      XMLNode *rval = NULL;
       if(i<children_.size()) rval = children_.at(i);
       return rval;
     }
 
   private:
+
     XMLNode(string name) : name_(name) {}
 
-    string             name_;`
+    void addAttribute(const string &key, const string &value) { attributes_[key] = value;   }
+    void addChild(XMLNode *node)                              { children_.push_back(node); }
+
+    string             name_;
     Attributes_t       attributes_;
     vector<XMLNode *>  children_;
 };
@@ -190,8 +194,7 @@ class ListOp : public XMLFunc::Operation
 class NegOp : public UnaryOp
 {
   public:
-    NegOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    NegOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return op_->eval(args).negate(); }
@@ -200,8 +203,7 @@ class NegOp : public UnaryOp
 class SinOp : public UnaryOp
 {
   public: 
-    SinOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    SinOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return sin(double(op_->eval(args))); }
@@ -210,8 +212,7 @@ class SinOp : public UnaryOp
 class CosOp : public UnaryOp
 {
   public:
-    CosOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    CosOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return cos(double(op_->eval(args))); }
@@ -220,8 +221,7 @@ class CosOp : public UnaryOp
 class TanOp : public UnaryOp
 {
   public:
-    TanOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    TanOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return tan(double(op_->eval(args))); }
@@ -230,8 +230,7 @@ class TanOp : public UnaryOp
 class AsinOp : public UnaryOp
 {
   public:
-    AsinOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    AsinOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return asin(double(op_->eval(args))); }
@@ -240,8 +239,7 @@ class AsinOp : public UnaryOp
 class AcosOp : public UnaryOp
 {
   public:
-    AcosOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    AcosOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return acos(double(op_->eval(args))); }
@@ -250,8 +248,7 @@ class AcosOp : public UnaryOp
 class AtanOp : public UnaryOp
 {
   public:
-    AtanOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    AtanOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return atan(double(op_->eval(args))); }
@@ -260,8 +257,7 @@ class AtanOp : public UnaryOp
 class DegOp : public UnaryOp
 {
   public: 
-    DegOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    DegOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     {
@@ -273,8 +269,7 @@ class DegOp : public UnaryOp
 class RadOp : public UnaryOp
 {
   public:
-    RadOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    RadOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     {
@@ -286,8 +281,7 @@ class RadOp : public UnaryOp
 class AbsOp : public UnaryOp
 {
   public:
-    AbsOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    AbsOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return op_->eval(args).abs(); }
@@ -296,8 +290,7 @@ class AbsOp : public UnaryOp
 class SqrtOp : public UnaryOp
 {
   public:
-    SqrtOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    SqrtOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return Number_t( sqrt(double(op_->eval(args))) ); }
@@ -306,8 +299,7 @@ class SqrtOp : public UnaryOp
 class ExpOp : public UnaryOp
 {
   public:
-    ExpOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    ExpOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return Number_t( exp(double(op_->eval(args))) ); }
@@ -316,8 +308,7 @@ class ExpOp : public UnaryOp
 class LnOp : public UnaryOp
 {
   public: 
-    LnOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : UnaryOp(attr,body,argDefs) {}
+    LnOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return Number_t( log(double(op_->eval(args))) ); }
@@ -326,8 +317,7 @@ class LnOp : public UnaryOp
 class LogOp : public UnaryOp
 {
   public:
-    LogOp(const XMLNode *xml, const ArgDefs &);
-    Number_t eval(const Args_t &args) const
+    LogOp(const XMLNode *xml, const ArgDefs &); Number_t eval(const Args_t &args) const
     {
       return Number_t( fac_ * log( double(op_->eval(args))) );
     }
@@ -338,8 +328,7 @@ class LogOp : public UnaryOp
 class SubOp : public BinaryOp
 {
   public: 
-    SubOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : BinaryOp(attr,body,argDefs) {}
+    SubOp(const XMLNode *xml, const ArgDefs &argDefs) : BinaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -347,8 +336,7 @@ class SubOp : public BinaryOp
 class DivOp : public BinaryOp
 {
   public: 
-    DivOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : BinaryOp(attr,body,argDefs) {}
+    DivOp(const XMLNode *xml, const ArgDefs &argDefs) : BinaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -356,8 +344,7 @@ class DivOp : public BinaryOp
 class PowOp : public BinaryOp
 {
   public: 
-    PowOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : BinaryOp(attr,body,argDefs) {}
+    PowOp(const XMLNode *xml, const ArgDefs &argDefs) : BinaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -365,8 +352,7 @@ class PowOp : public BinaryOp
 class ModOp : public BinaryOp
 {
   public: 
-    ModOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : BinaryOp(attr,body,argDefs) {}
+    ModOp(const XMLNode *xml, const ArgDefs &argDefs) : BinaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -374,8 +360,7 @@ class ModOp : public BinaryOp
 class Atan2Op : public BinaryOp
 {
   public: 
-    Atan2Op(const XMLNode *xml, const ArgDefs &argDefs)
-      : BinaryOp(attr,body,argDefs) {}
+    Atan2Op(const XMLNode *xml, const ArgDefs &argDefs) : BinaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -383,8 +368,7 @@ class Atan2Op : public BinaryOp
 class AddOp : public ListOp
 {
   public: 
-    AddOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : ListOp(attr,body,argDefs) {}
+    AddOp(const XMLNode *xml, const ArgDefs &argDefs) : ListOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -392,11 +376,150 @@ class AddOp : public ListOp
 class MultOp : public ListOp
 {
   public: 
-    MultOp(const XMLNode *xml, const ArgDefs &argDefs)
-      : ListOp(attr,body,argDefs) {}
+    MultOp(const XMLNode *xml, const ArgDefs &argDefs) : ListOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
+
+
+////////////////////////////////////////////////////////////////////////////////
+// XMLNode methods
+////////////////////////////////////////////////////////////////////////////////
+
+// Constructs a new XMLNode using the specified XML.
+//   Returns NULL if the XML string is empty.
+//   Returns the parent node if this is a closing tag
+//   Throws a runtime_error if invalid XMl syntax
+XMLNode *XMLNode::build(string &xml, XMLNode *parent)
+{
+  static const string english_alphabet = "abcdefghijklmnopqrstuvwxyz";
+
+  size_t end_xml = xml.length();
+
+  size_t start_tag = xml.find("<");
+  if( start_tag == string::npos )
+  {
+    if(has_content(xml)) invalid_xml("all content must be tagged");
+    return NULL;
+  }
+  if( has_content( xml.substr(0,start_tag) ) ) invalid_xml("all content must be tagged");
+
+  bool   is_closing(false);
+  size_t start_name = start_tag + 1;
+
+  if( xml.compare(start_tag,2,"</") == 0 ) // this is a closing tag
+  {
+    is_closing = true;
+    ++start_name;
+  }
+
+  size_t end_name = xml.find_first_not_of(english_alphabet,start_tag);
+  if( end_name==start_name) invalid_xml("missing tag name");
+  else if(end_name==string::npos) invalid_xml("tag is missing closing '>'");
+
+  string name = xml.substr(start_name, end_name-start_name);
+
+  // validate/handle closing tag
+ 
+  if(is_closing)
+  {
+    if(parent==NULL)
+      invalid_xml("closing </",name,"> tag has no opening tag");
+
+    if(name != parent->name())
+      invalid_xml("closing </",name,"> tag does not pair with opening <",parent->name(),"> tag");
+
+    size_t end_tag = skip_whitespace(xml,end_name);
+
+    if( end_tag == string::npos )
+      invalid_xml("</",name,"> tag does not have a closing '>'");
+
+    if( xml[end_tag] != '>' )
+      invalid_xml("closing tags cannot have attributes");
+
+    xml = xml.substr(end_tag+1);
+
+    return parent;
+  }
+
+  // find attributes
+
+  XMLNode *rval = new XMLNode(name);
+
+  bool is_opening_tag(false);
+
+  size_t end_tag(0);
+  size_t pos(end_name);
+  while( (pos=skip_whitespace(xml,pos)) != string::npos )
+  {
+    if(xml[pos]=='>') 
+    {
+      is_opening_tag = true;
+      end_tag = pos + 1;
+      break;
+    }
+    else if(xml.compare(pos,2,"/>")==0)
+    {
+      is_opening_tag = false;
+      end_tag = pos + 2;
+      break;
+    }
+    else
+    {
+      size_t start_key = pos;
+      size_t end_key = xml.find_first_not_of(english_alphabet,pos);
+
+      if(end_key==string::npos)
+        invalid_xml("attribute key '", xml.substr(pos), "' in <", name, "> has no assigned value");
+
+      if(xml[end_key]!='=')
+        invalid_xml("attribute key '", xml.substr(pos), "' in <", name, "> not followed by an '='");
+
+      if(end_key==start_key)
+        invalid_xml("attributes keys must consist solely of english alphabet characters");
+
+      size_t open_quote = end_key+1;
+      if( open_quote >= end_xml)
+        invalid_xml("<",name,"> tag does not have a closing '>'");
+
+      char q = xml[open_quote];
+      if( q!='\'' & q!='"' )
+        invalid_xml("value for attribute key '", xml.substr(pos), "' in <", name, "> is not quoted");
+
+      size_t start_value = open_quote+1;
+      if( start_value >= end_xml)
+        invalid_xml("<",name,"> tag does not have a closing '>'");
+
+      size_t end_value = xml.find(q,start_value);
+      if(end_value == string::npos)
+        invalid_xml("value for attribute key '", xml.substr(pos), "' in <", name, "> has no closing quote");
+
+      string key = xml.substr(start_key,end_key-start_key);
+      string value = xml.substr(start_value,end_value-start_value);
+
+      rval->addAttribute(key,value);
+
+      pos = end_value + 1;
+    }
+  }
+
+  xml = xml.substr(end_tag);
+
+  // Add children nodes if unless this a bodyless tag
+
+  if(is_opening_tag)
+  {
+    XMLNode *child = build(xml,rval);
+    while(child != rval)
+    {
+      if(child == NULL) invalid_xml("<", name, "> tag is missing closing </", name,"> tag");
+      rval->addChild(child);
+    }
+  }
+
+  return rval;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // XMLFunc methods
@@ -409,6 +532,8 @@ XMLFunc::XMLFunc(const string &src) : root_(NULL), numArgs_(0)
   string raw_xml = load_xml(src);
   raw_xml = strip_xml(raw_xml,"<?xml","?>"); // remove declaration
   raw_xml = strip_xml(raw_xml,"<!--","-->"); // remove comments
+
+  transform( raw_xml.begin(), raw_xml.end(), raw_xml.begin(), ::tolower );
 
   // Extract the arg definition list
   
@@ -423,7 +548,7 @@ XMLFunc::XMLFunc(const string &src) : root_(NULL), numArgs_(0)
 
   for(size_t i=0; i<numArgs_; ++i)
   {
-    const XMLNode *arg = arglist.child(i);
+    const XMLNode *arg = arglist->child(i);
     if(arg->name() != "arg") invalid_xml("<arglist> may only contain <arg> elements");
 
     NumberType_t type = Number_t::Double;
@@ -462,22 +587,6 @@ Number_t XMLFunc::eval(const Args_t &args) const
     err << "Insufficient arguments passed to eval.  Need " << numArgs_ 
       << ". Only " << args.size() << " were provided";
     throw runtime_error(err.str());
-  }
-
-  return root_->eval(args);
-}
-
-Number_t XMLFunc::eval(const Number_t *argArray) const
-{
-  // No exception will be thrown if argArray doesn't contain
-  //   enough elements... which may lead to unpredictable results
-  //   including the real possiblity of a segmentation fault
-
-  Args_t args;
-  for(int i=0; i<numArgs_; ++i)
-  {
-    const Number_t n = argArray[i];
-    args.push_back(n);
   }
 
   return root_->eval(args);
@@ -536,7 +645,7 @@ ArgOp::ArgOp(const XMLNode *xml, const ArgDefs &argDefs)
 
     index_ = (size_t)ival;
 
-    if( index_ < 0 || index_ >= argDefs.size() )
+    if( ival<0 || index_ >= argDefs.size() )
     {
       stringstream err;
       err << "Argument index " << index_ << " is out of range (0-" << argDefs.size()-1 << ")";
@@ -548,7 +657,7 @@ ArgOp::ArgOp(const XMLNode *xml, const ArgDefs &argDefs)
     string name;
     string extra;
 
-    if( read_token(name_str,name,extra) == false )
+    if( read_token(name_attr,name,extra) == false )
       invalid_xml("Arg name attribute must contain a non-empty string");
 
     if(has_content(extra)) 
@@ -563,7 +672,7 @@ ArgOp::ArgOp(const XMLNode *xml, const ArgDefs &argDefs)
 }
 
 
-UnaryOp::UnaryOp(const XMLNode *xml, const ArgDefs &argDefs) : op_(NULL);
+UnaryOp::UnaryOp(const XMLNode *xml, const ArgDefs &argDefs) : op_(NULL)
 {
   const string &arg = xml->attributeValue("arg");
 
@@ -647,7 +756,7 @@ ListOp::ListOp(const XMLNode *xml, const ArgDefs &argDefs)
   if(hasArg2 && numArg<2)
     invalid_xml(xml->name(), " op requires at least two arg attributes or child elements if arg2 is specified");
 
-  if(numArgs<1)
+  if(numArg<1)
     invalid_xml(xml->name(), " op requires at least one arg attribute or child element");
 
   size_t j(0);
@@ -655,7 +764,7 @@ ListOp::ListOp(const XMLNode *xml, const ArgDefs &argDefs)
   {
     Op_t *op = NULL;
     if( i==0 && hasArg1 )      op = build_op( arg1, argDefs );
-    else if( i==1 & hasArg2 )  op = build_op( arg2, argDefs );
+    else if( i==1 && hasArg2 ) op = build_op( arg2, argDefs );
     else                       op = build_op( xml->child(j++), argDefs );
     ops_.push_back(op);
   }
@@ -665,7 +774,7 @@ LogOp::LogOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs)
 {
   double base(10.);
 
-  double base_str = xml.attributeValue("base");
+  string base_str = xml->attributeValue("base");
   if( base_str.empty() == false )
   {
     string extra;
@@ -777,14 +886,6 @@ void invalid_xml(const string &m1,const string &m2,const string &m3,const string
   throw runtime_error(err);
 }
 
-bool is_bracket(const string &xml, size_t pos)
-{
-  char c = xml.at(pos);
-  if( c=='<' || c=='>' ) return true;
-  if( xml.compare(pos,2,"/>") == 0 ) return true;
-  return false;
-}
-
 // Determines if source is the name of a file or is already an XML string
 //   If the former, it loads the XML from the file
 //   If the latter, it simply returns the source string.
@@ -806,127 +907,6 @@ string load_xml(const string &src)
   return buffer.str();
 }
 
-
-// Validates XML and removes whitespace
-//   See readme file for XMLFunc specific validation rules:
-//    - no untagged data 
-//    - all attributes are of form key="value" or key='value'
-//    - closing tags have no attributes
-//    - no whitespace between start of tag and the tag name
-//  - replace all sequences of whitespace with a single space character
-//  - remove all whitespace outside of tags
-string cleanup_xml(const string &src)
-{
-  size_t len = src.length();
-
-  string rval;
-  rval.reserve(len);
-
-  bool ws  = false;
-  bool tag = false;
-  bool closing_tag = false;
-  char q   = '\0';
-
-  for(size_t i=0; i<len; ++i)
-  {
-    char c = src[i];
-
-    if(tag) // behvior within a tag
-    {
-      if(q)
-      {
-        // key everything in quotes (including final quote)
-        rval.push_back(c);
-        if(c==q) 
-        {
-          q='\0';  // exiting quote
-          ws = true; // will insert whitespace except at end of tag
-        }
-      }
-      else if(c=='/')
-      {
-        if(i+1>=len) invalid_xml("Incomplete tag at end of XML");
-        c = src[++i];
-        if(c!='>')   invalid_xml("/ in tag (after name) must be followed by '>'");
-        rval.append("/>");
-        ws = eq = tag = closing_tag = false;
-      }
-      else if(c=='=')
-      {
-        if(ws)       invalid_xml("'=' cannot be preceeded by whitespace");
-        if(i+1>=len) invalid_xml("Incomplete attribute at end of XML");
-        c = src[++i];
-        if( c=='\'' || c=='"' ) { q=c; }
-        else         invalid_xml("'=' must be immediately followed by a quoted value");
-        rval.push_back('=');
-        rval.push_back(q);
-        ws = false;
-      }
-      else if(c=='>')
-      {
-        rval.push_back(c);
-        ws = eq = tag = closing_tag = false;
-      }
-      else if(isalnum(c))
-      {
-        if(ws) rval.push_back(' ');
-        rval.push_back(c);
-        ws = false;
-      }
-      else if(isspace(c)) 
-      { 
-        ws = true; 
-      }
-      else
-      {
-        stringstream err;
-        err << "Invalid character ('" << c << "') found in XML";
-        invalid_xml(err.str());
-      }
-    }
-    else // behavior outside a tag
-    {
-      // Skip over all whitespace
-      // ONLY valid character is '<'
-
-      if(c=='<')
-      {
-        if(++i >= len) invalid_xml("Incomplete tag at end of XML");
-
-        rval.push_back(c);
-        tag = true;
-        ws  = false;
-
-        c = str[i];
-        closing_tag = (c=='/');
-
-        if(closing_tag)
-        {
-          rval.push_back(c);
-        }
-        else if(isalpha(c))
-        {
-          // advance to last valid character of tag name
-          // first chacter of tag name must be alpha
-          // all others can be alpha-numeric
-          rval.push_back(c);
-          while(i < len-1 && isalnum(str[i+1])) rval.push_back(str[++i]);
-        }
-        else
-        {
-          invalid_xml("Missing tag name");
-        }
-      }
-      else if(isspace(c)==false )
-      {
-        invalid_xml("All data must appear within tags");
-      }
-    }
-  }
-  
-  return rval;
-}
-
 // Removes specified string (based on start/end) from XML
 string strip_xml(const string &xml, const string &start, const string &end)
 {
@@ -942,8 +922,8 @@ string strip_xml(const string &xml, const string &start, const string &end)
     size_t start_del = rval.find(start);
     if(start_del == string::npos) break;
 
-    size_t end_del = rval.find(decl,start_del);
-    if(end_del==string::npos) invalid_rval(start," is missing closing ",end);
+    size_t end_del = rval.find(end,start_del);
+    if(end_del==string::npos) invalid_xml(start," is missing closing ",end);
 
     rval.erase(start_del, end_del + end.size() - start_del);
   }
@@ -951,402 +931,24 @@ string strip_xml(const string &xml, const string &start, const string &end)
   return rval;
 }
 
-// Finds the next tag in the XML and returns its key, attributes, and body.
-//   Returns the remaining XML string after removing the current element
-bool read_element(const string &xml, string &key, Attributes_t &attr, string &body, string &tail)
+// Locates the first non-whitespace character in the string beginning at
+//   the specified location.  Returns string::npos if all reamaining 
+//   characters are white space.
+size_t skip_whitespace(const string &s,size_t pos)
 {
-  key = "";
-  body = "";
-  attr.clear();
-
-  size_t pos = 0;
-  size_t end = xml.length();
-
-  while(pos<end && isspace(xml[pos])) ++pos;
-  if(pos==end)      return false;
-  if(xml[pos]!='<') return false;
-  
-  if(pos+1<end && xml[pos+1]=='/') invalid_xml("Cannot start element with closing tag");
-
-  size_t elem_start = pos;
-  size_t elem_end(0);
-
-  size_t attr_start(0);
-  size_t attr_end(0);
-
-  size_t body_start(0);
-  size_t body_end(0);
-
-  bool in_tag(true);
-  bool in_closing_tag(false);
-  bool in_key(false);
-
-  char q='\0';
-
-  vector<string> keys;
-
-  for( ++pos ; pos<end ; ++pos )
+  size_t end = s.length();
+  for(size_t i=pos; i<end; ++i)
   {
-    char c = xml[pos];
-
-    if(q) //currently in quoted text
-    {
-      if(c==q) q = '\0'; // closing quote found, exit quote
-    }
-    else if(c=='\'' || c=='"') // enter quote
-    {
-      q = c; // set quote type
-    }
-    else if(in_tag)
-    {
-      if(c=='<')
-      {
-        invalid_xml("Extraneous '<' found inside tag");
-      }
-      else if(c=='/')
-      {
-        if(pos+1 < end && xml[pos+1]=='>') // bodyless tag
-        {
-          if( in_closing_tag ) invalid_xml("Tag cannot start with </ and end with />");
-
-          in_tag = in_closing_tag = false;
-          key = keys.back();
-          keys.pop_back();
-
-          if(keys.empty()) 
-          { 
-            attr_end = pos-1;
-            pos+=2; 
-            break; 
-          }
-        }
-        else
-        {
-          invalid_xml("Extraneous '/' found inside tag");
-        }
-      }
-      else if(c=='>')
-      {
-      }
-    }
-    else // in body
-    {
-      if(c=='>')
-      {
-        invalid_xml("Extraneous '>' found outside XML tag");
-      }
-      if(c=='<') // entering tag
-      {
-        in_tag = true;
-
-        if( pos+1 < end && xml[pos+1]=='/' ) // </ => closing tag
-        {
-          ++pos;
-          in_closing_tag = true;
-
-          // validate key
-          key = keys.back();
-          keys.pop_back();
-          if( xml.compare(pos+1,key.size(),key) != 0 )
-            invalid_xml("Incorrectly nexted tags, missing closing tag for <",key,">");
-
-          if(keys.empty()) body_end = pos-1;
-        }
-        else // opening or body-less tag
-        {
-          size_t key_start = ++pos;
-          while(pos<end && isalpha(xml[pos]) ) ++pos;
-          if( pos==end ) invalid_xml("Incomplete opening tag");
-          if( pos==key_start) invalid_xml("Opening tag is missing key");
-
-          if(keys.empty()) attr_start = pos;
-
-          key = xml.substr(key_start,pos-key_start);
-          keys.push_back(key) ;
-          --pos;
-        }
-      }
-    }
+    if( isspace(s[i]) == false ) return i;
   }
+  return string::npos;
 }
 
-  // determine the key for this element
-
-  const size_t start_key = ++pos;
-
-  while(pos<end && !isspace(xml[pos]) && !is_bracket(xml,pos)) ++pos;
-  if(pos==end) return false;
-
-  key = xml.substr(start_key,pos-start_key);
-
-  // Find the closing '>' or '/>', parsing attributes along the way
-  //
-  // There are three ways out of the following while loop
-  //   - finding '/>' indicates an empty-body tag: exit is return from this function
-  //   - finding '>'  indicates an opening tag: while loop is exited with a break;
-  //   - finding neither: the loop exits when it runs out of string to parse (an exception will be thrown)
-
-  size_t attr_start(pos);
-  size_t body_start(0);
-
-  char q='\0';
-
-  while( pos<end )
-  {
-    char c = xml[pos];
-   
-    if(c=='>')
-    {
-      // This is a tag with a body (i.e. <key...>[...]</key>
-      attr_end   = pos-1;
-      body_start = ++pos;
-      break;
-    }
-    else if(c=='/')
-    {
-      // This is an empty-element tag (i.e. <key .... />), i.e. no body
-      if(pos==end-1 || xml[pos+1] != '>') invalid_xml("Missing closing '>' for ",key);
-
-      attr_end = pos-1;
-      break;
-    }
-    else if( isalpha(c) )
-    {
-      string attr_key;
-      string attr_value;
-      read_next_attr(xml,pos,attr_key,attr_value); // advances pos
-
-      if(attr_key.empty())
-        invalid_xml("Failed to parse attributes for <",key,">");
-
-      if(attr.find(attr_key)!=attr.end()) 
-        invalid_xml("Cannot specify more than one ",attr_key," attribute in <",key,">");
-
-      attr[attr_key] = attr_value;
-    }
-    else if( isspace(c) )
-    {
-      ++pos; // simply advance to next character in XML
-    }
-    else
-    {
-      stringstream err;
-      err << "Don't know what to do with '"<<c<<"' in <"<<key<<">";
-      invalid_xml(err.str());
-    }
-  }
-
-  if(body_start==0) invalid_xml("Missing closing '>' for <",key,">");
-
-  // Here comes the tricky part... we need to find the closing tag.
-  //   We need to handle nested tags including open/close pairs and empty-body tags
-  //   We need to ignore anything in quotes
-
-  char q(0);          // current quote char (' or ")
-  int  depth(1);      // current nested tag depth
-  bool in_tag(false); 
-  bool in_closing_tag(false);
-
-  size_t body_end(0);
-
-  while( pos<end )
-  {
-    char c = xml[pos];
-
-    if(q) // currently in quoted text
-    {
-      if(c==q) q=0; // closing quote found, exit quote
-    }
-    else if(in_tag)
-    {
-      if(c=='\'' || c=='"')
-      {
-        q = c; // set quote type
-      }
-      else if(c=='<') 
-      {
-        invalid_xml("Nesting '<' in body of <",key,">");
-      }
-      else if(c=='>') // 
-      {
-        if(in_closing_tag) --depth;  // closing tag
-        else               ++depth;  // opening tag
-        in_tag = false;
-
-        if(depth==0) // exited closing tag for element we're reading
-        {
-          ++pos;
-          break;
-        }
-      }
-      else if(c=='/') // empty-body tag
-      {
-        if(pos >= end-1)    invalid_xml("Incomplete body for <",key,">");
-        if(xml[++pos]!='>') invalid_xml("/ without /> in <",key,">");
-        in_tag = false;
-      }
-    }
-    else if(c=='<') // starting new tag (don't know yet what type)
-    {
-      in_tag = true;
-      if(pos >= end-1) invalid_xml("Incomplete body for <",key,">");
-
-      in_closing_tag = (xml[pos+1]=='/');
-
-      if( closing_tag )
-      {
-        ++pos;
-        if( depth==1 ) // closing tag for element we're reading, verify key
-        {
-          body_end = pos-1;
-          if( xml.compare(pos+1,key.length(),key) != 0 )
-            invalid_xml("Incorrectly nested tags, cannot find closing tag for <",key,">");
-        }
-      }
-    }
-
-    ++pos; // advance to next character
-  }
-
-  if(body_end==0) invalid_xml("Missing closing tag for <",key,">");
-  body = xml.substr(body_start, body_end-body_start);
-
-  tail = xml.substr(pos);
-  return true;
-}
-
-bool read_attr(const string &xml,string &key,string &value, string &tail)
-{
-  if(has_content(xml)==false) return false;
-
-  key = "";
-  value = "";
-
-  size_t end = xml.length();
-  
-  size_t start_key(0);
-  while( start_key<end && isspace(xml[start_key]) ) ++start_key;
-
-  if(start_key == end) return false;
-  if(isalpha(xml[start_key])==false) invalid_xml("attribute keys must start with a roman letter");
-
-  size_t end_key = start_key;
-  while( end_key<end && isalnum(xml[end_key]) ) ++end_key;
-
-  if(end_key == end ) invalid_xml("attribute is missing value");
-
-  size_t start_value = end_key;
-  while( start_value<end && isspace(xml[start_value]) ) ++start_value;
-  if( start_value == end || xml[start_value] != '=' ) invalid_xml("attribute is missing '='");
-  ++start_value;
-  while( start_value<pos && isspace(xml[start_value]) ) ++start_value;
-  if( start_value == end ) invalid_xml("attribute is missing value");
-  
-  char q = xml[start_value];
-  if( q != '\'' && q != '"' ) invalid_xml("attribute value must be in quotes");
-  ++start_value;
-
-  size_t end_value = start_value;
-  while( end_value<end && xml[end_value] != q ) ++end_value;
-  if( end_value == end ) invalid_xml("attribute value is missing closing quote");
-
-  key = xml.substr(start_key, end_key-start_key);
-  value = xml.substr(start_value, end_value-start_value);
-  tail = xml.substr( end_value + 1 );
-
-  return true;
-}
-
-Op_t *build_op(const string &&xml, const ArgDefs &argDefs, string &tail)
-{
-  Op_t *rval=NULL;
-
-  // get the first token off of the XML string
-  //   return NULL if none is found
-
-  string token;
-  string tail;
-
-  if( read_token(xml,token,tail) == false ) return NULL;
-
-  // if token does not start with '<' (aka is not a tag), look to see if
-  //   it is either a numeric value or argument name
-
-  if( token[0] != '<' )
-  {
-    string extra;
-
-    long ival;
-    if( read_integer( token, ival, extra ) )
-    {
-      if(has_content(extra)) 
-        invalid_xml("Extraneous data found after integer value (",extra,")");
-
-      return new ConstOp(ival);
-    }
-
-    double dval;
-    if( read_double( token, dval, extra ) )
-    {
-      if(has_content(extra)) 
-        invalid_xml("Extraneous data found after double value (",extra,")");
-
-      return new ConstOp(dval);
-    }
-
-    int index = argDefs.lookup(token);
-    if( index < 0 ) invalid_xml("Unrecognized argument name (",token,")");
-
-    return new ArgOp(index);
-  }
-
-  // good to go to parse XML
-
-  string key="";
-  Attributes_t attr;
-  string body="";
-
-  if( read_element(xml,key,attr,body,tail) == false ) return NULL;
-
-  if      ( key == "double"  ) { rval = new ConstOp( attr,body,argDefs, Number_t::Double  ); }
-  else if ( key == "float"   ) { rval = new ConstOp( attr,body,argDefs, Number_t::Double  ); }
-  else if ( key == "real"    ) { rval = new ConstOp( attr,body,argDefs, Number_t::Double  ); }
-  else if ( key == "integer" ) { rval = new ConstOp( attr,body,argDefs, Number_t::Integer ); }
-  else if ( key == "int"     ) { rval = new ConstOp( attr,body,argDefs, Number_t::Integer ); }
-  else if ( key == "arg"     ) { rval = new   ArgOp( attr,body,argDefs ); }
-  else if ( key == "neg"     ) { rval = new   NegOp( attr,body,argDefs ); }
-  else if ( key == "sin"     ) { rval = new   SinOp( attr,body,argDefs ); }
-  else if ( key == "cos"     ) { rval = new   CosOp( attr,body,argDefs ); }
-  else if ( key == "tan"     ) { rval = new   TanOp( attr,body,argDefs ); }
-  else if ( key == "asin"    ) { rval = new  AsinOp( attr,body,argDefs ); }
-  else if ( key == "acos"    ) { rval = new  AcosOp( attr,body,argDefs ); }
-  else if ( key == "atan"    ) { rval = new  AtanOp( attr,body,argDefs ); }
-  else if ( key == "deg"     ) { rval = new   DegOp( attr,body,argDefs ); }
-  else if ( key == "rad"     ) { rval = new   RadOp( attr,body,argDefs ); }
-  else if ( key == "abs"     ) { rval = new   AbsOp( attr,body,argDefs ); }
-  else if ( key == "sqrt"    ) { rval = new  SqrtOp( attr,body,argDefs ); }
-  else if ( key == "exp"     ) { rval = new   ExpOp( attr,body,argDefs ); }
-  else if ( key == "ln"      ) { rval = new    LnOp( attr,body,argDefs ); }
-  else if ( key == "log"     ) { rval = new   LogOp( attr,body,argDefs ); }
-  else if ( key == "sub"     ) { rval = new   SubOp( attr,body,argDefs ); }
-  else if ( key == "div"     ) { rval = new   DivOp( attr,body,argDefs ); }
-  else if ( key == "pow"     ) { rval = new   PowOp( attr,body,argDefs ); }
-  else if ( key == "mod"     ) { rval = new   ModOp( attr,body,argDefs ); }
-  else if ( key == "atan2"   ) { rval = new Atan2Op( attr,body,argDefs ); }
-  else if ( key == "add"     ) { rval = new   AddOp( attr,body,argDefs ); }
-  else if ( key == "mult"    ) { rval = new  MultOp( attr,body,argDefs ); }
-  else
-  {
-    invalid_xml("Unrecognized operator key (",key,")");
-  }
-
-  return rval;
-}
 
 // returns whether or not the string has something other than whitespace
 bool has_content(const string &s)
 {
-  for(size_t i=0; i<s.length() ++i)
+  for(size_t i=0; i<s.length(); ++i)
   {
     if( isspace( s[i] ) == false ) return true;
   }
@@ -1412,3 +1014,80 @@ bool read_token(const string &s, string &token, string &tail)
 
   return true;
 }
+
+
+// Constructs an XMLFunc::operation pointer from an attribute value
+Op_t *build_op(const string &xml, const ArgDefs &argDefs)
+{
+  string token;
+  string extra;
+
+  if( read_token(xml,token,extra) == false ) invalid_xml("empty argument value");
+  if( has_content(extra) )                   invalid_xml("extraneous data in arg value ('", extra,"')");
+
+  long ival;
+  if( read_integer( token, ival, extra ) )
+  {
+    if(has_content(extra)) 
+      invalid_xml("Extraneous data found after integer value (",extra,")");
+
+    return new ConstOp(ival);
+  }
+
+  double dval;
+  if( read_double( token, dval, extra ) )
+  {
+    if(has_content(extra)) 
+      invalid_xml("Extraneous data found after double value (",extra,")");
+
+    return new ConstOp(dval);
+  }
+
+  int index = argDefs.lookup(token);
+  if( index < 0 ) invalid_xml("Unrecognized argument name (",token,")");
+
+  return new ArgOp(index);
+}
+
+// Constructs an XMLFunc::operation pointer from an XMLNode
+Op_t *build_op(const XMLNode *xml, const ArgDefs &argDefs)
+{
+  Op_t *rval=NULL;
+
+  string name=xml->name();
+
+  if      ( name == "double"  ) { rval = new ConstOp( xml,argDefs, Number_t::Double  ); }
+  else if ( name == "float"   ) { rval = new ConstOp( xml,argDefs, Number_t::Double  ); }
+  else if ( name == "real"    ) { rval = new ConstOp( xml,argDefs, Number_t::Double  ); }
+  else if ( name == "integer" ) { rval = new ConstOp( xml,argDefs, Number_t::Integer ); }
+  else if ( name == "int"     ) { rval = new ConstOp( xml,argDefs, Number_t::Integer ); }
+  else if ( name == "arg"     ) { rval = new   ArgOp( xml,argDefs ); }
+  else if ( name == "neg"     ) { rval = new   NegOp( xml,argDefs ); }
+  else if ( name == "sin"     ) { rval = new   SinOp( xml,argDefs ); }
+  else if ( name == "cos"     ) { rval = new   CosOp( xml,argDefs ); }
+  else if ( name == "tan"     ) { rval = new   TanOp( xml,argDefs ); }
+  else if ( name == "asin"    ) { rval = new  AsinOp( xml,argDefs ); }
+  else if ( name == "acos"    ) { rval = new  AcosOp( xml,argDefs ); }
+  else if ( name == "atan"    ) { rval = new  AtanOp( xml,argDefs ); }
+  else if ( name == "deg"     ) { rval = new   DegOp( xml,argDefs ); }
+  else if ( name == "rad"     ) { rval = new   RadOp( xml,argDefs ); }
+  else if ( name == "abs"     ) { rval = new   AbsOp( xml,argDefs ); }
+  else if ( name == "sqrt"    ) { rval = new  SqrtOp( xml,argDefs ); }
+  else if ( name == "exp"     ) { rval = new   ExpOp( xml,argDefs ); }
+  else if ( name == "ln"      ) { rval = new    LnOp( xml,argDefs ); }
+  else if ( name == "log"     ) { rval = new   LogOp( xml,argDefs ); }
+  else if ( name == "sub"     ) { rval = new   SubOp( xml,argDefs ); }
+  else if ( name == "div"     ) { rval = new   DivOp( xml,argDefs ); }
+  else if ( name == "pow"     ) { rval = new   PowOp( xml,argDefs ); }
+  else if ( name == "mod"     ) { rval = new   ModOp( xml,argDefs ); }
+  else if ( name == "atan2"   ) { rval = new Atan2Op( xml,argDefs ); }
+  else if ( name == "add"     ) { rval = new   AddOp( xml,argDefs ); }
+  else if ( name == "mult"    ) { rval = new  MultOp( xml,argDefs ); }
+  else
+  {
+    invalid_xml("Unrecognized operator name (",name,")");
+  }
+
+  return rval;
+}
+
