@@ -21,19 +21,18 @@ typedef map<string,string> Attributes_t;
 typedef XMLFunc::Number      Number_t;
 typedef Number_t::Type_t     NumberType_t;
 typedef XMLFunc::Operation   Op_t;
-typedef XMLFunc::Args_t      Args_t;
+typedef XMLFunc::ArgDefs     ArgDefs_t;
+typedef XMLFunc::Args        Args_t;
 
 class XMLNode;
 
-class ArgDefs;
-
 // prototypes for support functions
 
-void invalid_xml(const string &err1,
-                 const string &err2="",
-                 const string &err3="",
-                 const string &err4="",
-                 const string &err5="");
+#define INVALID_XML(err) { \
+  stringstream msg; \
+  msg << "Invalid XML [" << __FILE__ << ":" << __LINE__ << "]: " << err; \
+  throw runtime_error(msg.str()); \
+}
 
 string load_xml     (const string &src);
 string strip_xml    (const string &xml, const string &start, const string &end);
@@ -46,46 +45,13 @@ bool   read_double  (const string &s, double &dval,  string &tail);
 bool   read_integer (const string &s, long   &ival,  string &tail);
 bool   read_token   (const string &s, string &token, string &tail);
 
-Op_t *build_op(const string &arg,  const ArgDefs &);
-Op_t *build_op(const XMLNode *xml, const ArgDefs &);
+Op_t *build_op(const string &arg,  const ArgDefs_t &);
+Op_t *build_op(const XMLNode *xml, const ArgDefs_t &);
 
 
 ////////////////////////////////////////////////////////////////////////////////
 // Support classes
 ////////////////////////////////////////////////////////////////////////////////
-
-class ArgDefs
-{
-  public:
-    ArgDefs(void) {}
-
-    void add(NumberType_t type, const string &name="")
-    {
-      if(name.empty()==false) xref_[name] = int(types_.size());
-      types_.push_back(type);
-    }
-
-    int          size(void)  const { return int(types_.size()); }
-    NumberType_t type(int i) const { return types_.at(i);  }
-
-    int index(const string &name) const
-    {
-      NameXref_t::const_iterator i = xref_.find(name);
-      if( i == xref_.end() ) invalid_xml("bad argument name (",name,")");
-      return i->second;
-    }
-
-    int lookup(const string &name) const
-    {
-      NameXref_t::const_iterator i = xref_.find(name);
-      return (i==xref_.end() ? -1 : i->second );
-    }
-
-  private:
-    typedef map<string,int> NameXref_t;
-    vector<NumberType_t> types_;
-    NameXref_t xref_;
-};
 
 class XMLNode
 {
@@ -136,6 +102,27 @@ class XMLNode
 };
 
 
+// XMLFunc::ArgDefs methods
+
+void XMLFunc::ArgDefs::add(NumberType_t type, const string &name)
+{
+  if(name.empty()==false) xref_[name] = int(types_.size());
+  types_.push_back(type);
+}
+
+int XMLFunc::ArgDefs::index(const string &name) const
+{
+  map<string,int>::const_iterator i = xref_.find(name);
+  if( i == xref_.end() ) INVALID_XML("bad argument name (" << name << ")");
+  return i->second;
+}
+
+int XMLFunc::ArgDefs::lookup(const string &name) const
+{
+  map<string,int>::const_iterator i = xref_.find(name);
+  return (i==xref_.end() ? -1 : i->second );
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // XMLFunc::Op subclasses
 ////////////////////////////////////////////////////////////////////////////////
@@ -143,7 +130,7 @@ class XMLNode
 class ConstOp : public XMLFunc::Operation
 {
   public:
-    ConstOp(const XMLNode *xml, const ArgDefs &, NumberType_t);
+    ConstOp(const XMLNode *xml, const ArgDefs_t &, NumberType_t);
     ConstOp(long v)   : value_(v) {}
     ConstOp(double v) : value_(v) {}
     Number_t eval(const Args_t &args) const { return value_; }
@@ -154,7 +141,7 @@ class ConstOp : public XMLFunc::Operation
 class ArgOp : public XMLFunc::Operation
 {
   public:
-    ArgOp(const XMLNode *xml, const ArgDefs &);
+    ArgOp(const XMLNode *xml, const ArgDefs_t &);
     ArgOp(size_t i) : index_(i) {}
     Number_t eval(const Args_t &args) const { return args.at(index_); }
   private:
@@ -165,7 +152,7 @@ class ArgOp : public XMLFunc::Operation
 class UnaryOp : public XMLFunc::Operation
 {
   public:
-    UnaryOp(const XMLNode *xml, const ArgDefs &);
+    UnaryOp(const XMLNode *xml, const ArgDefs_t &);
     ~UnaryOp() { if(op_!=NULL) delete op_; }
   protected:
     Op_t *op_;
@@ -174,7 +161,7 @@ class UnaryOp : public XMLFunc::Operation
 class BinaryOp : public XMLFunc::Operation
 {
   public:
-    BinaryOp(const XMLNode *xml, const ArgDefs &);
+    BinaryOp(const XMLNode *xml, const ArgDefs_t &);
     ~BinaryOp() { if(op1_!=NULL) delete op1_; if(op2_!=NULL) delete op2_; }
   protected:
     Op_t *op1_;
@@ -184,7 +171,7 @@ class BinaryOp : public XMLFunc::Operation
 class ListOp : public XMLFunc::Operation
 {
   public:
-    ListOp(const XMLNode *xml, const ArgDefs &);
+    ListOp(const XMLNode *xml, const ArgDefs_t &);
     ~ListOp() 
     { for(vector<Op_t *>::iterator i=ops_.begin(); i!=ops_.end(); ++i) delete *i; }
   protected:
@@ -194,7 +181,7 @@ class ListOp : public XMLFunc::Operation
 class NegOp : public UnaryOp
 {
   public:
-    NegOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    NegOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return op_->eval(args).negate(); }
@@ -203,7 +190,7 @@ class NegOp : public UnaryOp
 class SinOp : public UnaryOp
 {
   public: 
-    SinOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    SinOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return sin(double(op_->eval(args))); }
@@ -212,7 +199,7 @@ class SinOp : public UnaryOp
 class CosOp : public UnaryOp
 {
   public:
-    CosOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    CosOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return cos(double(op_->eval(args))); }
@@ -221,7 +208,7 @@ class CosOp : public UnaryOp
 class TanOp : public UnaryOp
 {
   public:
-    TanOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    TanOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return tan(double(op_->eval(args))); }
@@ -230,7 +217,7 @@ class TanOp : public UnaryOp
 class AsinOp : public UnaryOp
 {
   public:
-    AsinOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    AsinOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return asin(double(op_->eval(args))); }
@@ -239,7 +226,7 @@ class AsinOp : public UnaryOp
 class AcosOp : public UnaryOp
 {
   public:
-    AcosOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    AcosOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return acos(double(op_->eval(args))); }
@@ -248,7 +235,7 @@ class AcosOp : public UnaryOp
 class AtanOp : public UnaryOp
 {
   public:
-    AtanOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    AtanOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return atan(double(op_->eval(args))); }
@@ -257,7 +244,7 @@ class AtanOp : public UnaryOp
 class DegOp : public UnaryOp
 {
   public: 
-    DegOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    DegOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     {
@@ -269,7 +256,7 @@ class DegOp : public UnaryOp
 class RadOp : public UnaryOp
 {
   public:
-    RadOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    RadOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     {
@@ -281,7 +268,7 @@ class RadOp : public UnaryOp
 class AbsOp : public UnaryOp
 {
   public:
-    AbsOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    AbsOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return op_->eval(args).abs(); }
@@ -290,7 +277,7 @@ class AbsOp : public UnaryOp
 class SqrtOp : public UnaryOp
 {
   public:
-    SqrtOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    SqrtOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return Number_t( sqrt(double(op_->eval(args))) ); }
@@ -299,7 +286,7 @@ class SqrtOp : public UnaryOp
 class ExpOp : public UnaryOp
 {
   public:
-    ExpOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    ExpOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return Number_t( exp(double(op_->eval(args))) ); }
@@ -308,7 +295,7 @@ class ExpOp : public UnaryOp
 class LnOp : public UnaryOp
 {
   public: 
-    LnOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs) {}
+    LnOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const
     { return Number_t( log(double(op_->eval(args))) ); }
@@ -317,7 +304,7 @@ class LnOp : public UnaryOp
 class LogOp : public UnaryOp
 {
   public:
-    LogOp(const XMLNode *xml, const ArgDefs &); Number_t eval(const Args_t &args) const
+    LogOp(const XMLNode *xml, const ArgDefs_t &); Number_t eval(const Args_t &args) const
     {
       return Number_t( fac_ * log( double(op_->eval(args))) );
     }
@@ -328,7 +315,7 @@ class LogOp : public UnaryOp
 class SubOp : public BinaryOp
 {
   public: 
-    SubOp(const XMLNode *xml, const ArgDefs &argDefs) : BinaryOp(xml,argDefs) {}
+    SubOp(const XMLNode *xml, const ArgDefs_t &argDefs) : BinaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -336,7 +323,7 @@ class SubOp : public BinaryOp
 class DivOp : public BinaryOp
 {
   public: 
-    DivOp(const XMLNode *xml, const ArgDefs &argDefs) : BinaryOp(xml,argDefs) {}
+    DivOp(const XMLNode *xml, const ArgDefs_t &argDefs) : BinaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -344,7 +331,7 @@ class DivOp : public BinaryOp
 class PowOp : public BinaryOp
 {
   public: 
-    PowOp(const XMLNode *xml, const ArgDefs &argDefs) : BinaryOp(xml,argDefs) {}
+    PowOp(const XMLNode *xml, const ArgDefs_t &argDefs) : BinaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -352,7 +339,7 @@ class PowOp : public BinaryOp
 class ModOp : public BinaryOp
 {
   public: 
-    ModOp(const XMLNode *xml, const ArgDefs &argDefs) : BinaryOp(xml,argDefs) {}
+    ModOp(const XMLNode *xml, const ArgDefs_t &argDefs) : BinaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -360,7 +347,7 @@ class ModOp : public BinaryOp
 class Atan2Op : public BinaryOp
 {
   public: 
-    Atan2Op(const XMLNode *xml, const ArgDefs &argDefs) : BinaryOp(xml,argDefs) {}
+    Atan2Op(const XMLNode *xml, const ArgDefs_t &argDefs) : BinaryOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -368,7 +355,7 @@ class Atan2Op : public BinaryOp
 class AddOp : public ListOp
 {
   public: 
-    AddOp(const XMLNode *xml, const ArgDefs &argDefs) : ListOp(xml,argDefs) {}
+    AddOp(const XMLNode *xml, const ArgDefs_t &argDefs) : ListOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -376,7 +363,7 @@ class AddOp : public ListOp
 class MultOp : public ListOp
 {
   public: 
-    MultOp(const XMLNode *xml, const ArgDefs &argDefs) : ListOp(xml,argDefs) {}
+    MultOp(const XMLNode *xml, const ArgDefs_t &argDefs) : ListOp(xml,argDefs) {}
 
     Number_t eval(const Args_t &args) const;
 };
@@ -392,17 +379,18 @@ class MultOp : public ListOp
 //   Throws a runtime_error if invalid XMl syntax
 XMLNode *XMLNode::build(string &xml, XMLNode *parent)
 {
-  static const string english_alphabet = "abcdefghijklmnopqrstuvwxyz";
+  static const string alpha      = "abcdefghijklmnopqrstuvwxyz";
+  static const string alphanum   = alpha + "0123456789";
 
   size_t end_xml = xml.length();
 
   size_t start_tag = xml.find("<");
   if( start_tag == string::npos )
   {
-    if(has_content(xml)) invalid_xml("all content must be tagged");
+    if(has_content(xml)) INVALID_XML("all content must be tagged");
     return NULL;
   }
-  if( has_content( xml.substr(0,start_tag) ) ) invalid_xml("all content must be tagged");
+  if( has_content( xml.substr(0,start_tag) ) ) INVALID_XML("all content must be tagged");
 
   bool   is_closing(false);
   size_t start_name = start_tag + 1;
@@ -413,9 +401,9 @@ XMLNode *XMLNode::build(string &xml, XMLNode *parent)
     ++start_name;
   }
 
-  size_t end_name = xml.find_first_not_of(english_alphabet,start_tag);
-  if( end_name==start_name) invalid_xml("missing tag name");
-  else if(end_name==string::npos) invalid_xml("tag is missing closing '>'");
+  size_t end_name = xml.find_first_not_of(alpha,start_name);
+  if( end_name==start_name  ) INVALID_XML("missing tag name");
+  if( end_name==string::npos) INVALID_XML("tag is missing closing '>'");
 
   string name = xml.substr(start_name, end_name-start_name);
 
@@ -424,18 +412,18 @@ XMLNode *XMLNode::build(string &xml, XMLNode *parent)
   if(is_closing)
   {
     if(parent==NULL)
-      invalid_xml("closing </",name,"> tag has no opening tag");
+      INVALID_XML("closing </" << name << "> tag has no opening tag");
 
     if(name != parent->name())
-      invalid_xml("closing </",name,"> tag does not pair with opening <",parent->name(),"> tag");
+      INVALID_XML("closing </" << name << "> tag does not pair with opening <" << parent->name() << "> tag");
 
     size_t end_tag = skip_whitespace(xml,end_name);
 
     if( end_tag == string::npos )
-      invalid_xml("</",name,"> tag does not have a closing '>'");
+      INVALID_XML("</" << name << "> tag does not have a closing '>'");
 
     if( xml[end_tag] != '>' )
-      invalid_xml("closing tags cannot have attributes");
+      INVALID_XML("closing tags cannot have attributes");
 
     xml = xml.substr(end_tag+1);
 
@@ -466,40 +454,56 @@ XMLNode *XMLNode::build(string &xml, XMLNode *parent)
     }
     else
     {
+      if( xml.find_first_of(alpha,pos) != pos )
+        INVALID_XML("attribute keys must start with a-z, not '" << xml.substr(pos,1) << "'");
+
       size_t start_key = pos;
-      size_t end_key = xml.find_first_not_of(english_alphabet,pos);
+      size_t end_key = xml.find_first_not_of(alphanum,pos);
 
       if(end_key==string::npos)
-        invalid_xml("attribute key '", xml.substr(pos), "' in <", name, "> has no assigned value");
-
-      if(xml[end_key]!='=')
-        invalid_xml("attribute key '", xml.substr(pos), "' in <", name, "> not followed by an '='");
-
-      if(end_key==start_key)
-        invalid_xml("attributes keys must consist solely of english alphabet characters");
-
-      size_t open_quote = end_key+1;
-      if( open_quote >= end_xml)
-        invalid_xml("<",name,"> tag does not have a closing '>'");
-
-      char q = xml[open_quote];
-      if( q!='\'' & q!='"' )
-        invalid_xml("value for attribute key '", xml.substr(pos), "' in <", name, "> is not quoted");
-
-      size_t start_value = open_quote+1;
-      if( start_value >= end_xml)
-        invalid_xml("<",name,"> tag does not have a closing '>'");
-
-      size_t end_value = xml.find(q,start_value);
-      if(end_value == string::npos)
-        invalid_xml("value for attribute key '", xml.substr(pos), "' in <", name, "> has no closing quote");
+        INVALID_XML("attribute key '" << xml.substr(start_key) << "' in <" << name << "> has no assigned value");
 
       string key = xml.substr(start_key,end_key-start_key);
+
+      if(xml[end_key]!='=')
+        INVALID_XML("attribute key '" << key << "' in <" << name << "> not followed by an '='");
+
+      if(end_key==start_key)
+        INVALID_XML("attributes keys must consist solely of alphanumeric characters");
+
+      size_t start_value = end_key+1;
+      if( start_value >= end_xml)
+        INVALID_XML("<" << name << "> tag does not have a closing '>'");
+
+
+      // value may or may not be quoted
+      size_t end_value = start_value;
+
+      char q = xml[start_value];
+      if( q=='"' || q=='\'' ) 
+      { 
+        start_value += 1; 
+        if( start_value >= end_xml)
+          INVALID_XML("<" << name << "> tag does not have a closing '>'");
+
+        end_value = xml.find(q,start_value);
+        if(end_value == string::npos)
+          INVALID_XML("value for attribute key '" << key << "' in <" << name << "> has no closing quote");
+        
+        pos = end_value+1;
+      }
+      else
+      { 
+        end_value = xml.find_first_not_of(alphanum+".-+",start_value);
+        if(end_value == string::npos)
+          INVALID_XML("<" << name << "> tag does not have a closing '>'");
+        
+        pos = end_value;
+      }
+
       string value = xml.substr(start_value,end_value-start_value);
 
       rval->addAttribute(key,value);
-
-      pos = end_value + 1;
     }
   }
 
@@ -509,10 +513,9 @@ XMLNode *XMLNode::build(string &xml, XMLNode *parent)
 
   if(is_opening_tag)
   {
-    XMLNode *child = build(xml,rval);
-    while(child != rval)
+    for(XMLNode *child=build(xml,rval); child!=rval; child=build(xml,rval))
     {
-      if(child == NULL) invalid_xml("<", name, "> tag is missing closing </", name,"> tag");
+      if(child == NULL) INVALID_XML("<" << name << "> tag is missing closing </" << name <<"> tag");
       rval->addChild(child);
     }
   }
@@ -527,7 +530,7 @@ XMLNode *XMLNode::build(string &xml, XMLNode *parent)
 
 // XMLFunc constructor
 
-XMLFunc::XMLFunc(const string &src) : root_(NULL), numArgs_(0)
+XMLFunc::XMLFunc(const string &src) : root_(NULL)
 {
   string raw_xml = load_xml(src);
   raw_xml = strip_xml(raw_xml,"<?xml","?>"); // remove declaration
@@ -537,19 +540,17 @@ XMLFunc::XMLFunc(const string &src) : root_(NULL), numArgs_(0)
 
   // Extract the arg definition list
   
-  ArgDefs argDefs;
-
   XMLNode *arglist = XMLNode::build(raw_xml);
-  if(arglist==NULL)                invalid_xml("empty");
-  if(arglist->name() != "arglist") invalid_xml("missing <arglist> element");
+  if(arglist==NULL)                INVALID_XML("empty");
+  if(arglist->name() != "arglist") INVALID_XML("missing <arglist> element");
 
-  numArgs_ = arglist->numChildren();
-  if(numArgs_==0)  invalid_xml("<arglist> is empty");
+  size_t numArgs = arglist->numChildren();
+  if(numArgs==0)  INVALID_XML("<arglist> is empty");
 
-  for(size_t i=0; i<numArgs_; ++i)
+  for(size_t i=0; i<numArgs; ++i)
   {
     const XMLNode *arg = arglist->child(i);
-    if(arg->name() != "arg") invalid_xml("<arglist> may only contain <arg> elements");
+    if(arg->name() != "arg") INVALID_XML("<arglist> may only contain <arg> elements");
 
     NumberType_t type = Number_t::Double;
 
@@ -561,32 +562,44 @@ XMLFunc::XMLFunc(const string &src) : root_(NULL), numArgs_(0)
       else if(type_str == "real")    { type = Number_t::Double; }
       else if(type_str == "integer") { type = Number_t::Integer; }
       else if(type_str == "int")     { type = Number_t::Integer; }
-      else invalid_xml("Unknown argument type: ", type_str);
+      else INVALID_XML("Unknown argument type: " << type_str);
     }
 
     const string &name = arg->attributeValue("name");
 
-    if( name.empty() ) { argDefs.add(type); }
-    else               { argDefs.add(type,name); }
+    if( name.empty() ) { argDefs_.add(type); }
+    else               { argDefs_.add(type,name); }
   }
 
   // Extract the function defintion
 
   XMLNode *xml = XMLNode::build(raw_xml);
-  if(!xml) invalid_xml("missing valid root value element");
-  if(has_content(raw_xml)) invalid_xml("only one root value element allowed");
+  if(!xml) INVALID_XML("missing valid root value element");
+  if(has_content(raw_xml)) INVALID_XML("only one root value element allowed");
 
-  root_ = build_op(xml,argDefs);
+  root_ = build_op(xml,argDefs_);
 }
 
 Number_t XMLFunc::eval(const Args_t &args) const
 {
-  if( args.size() < numArgs_ )
+  if( args.size() < argDefs_.count() )
   {
     stringstream err;
-    err << "Insufficient arguments passed to eval.  Need " << numArgs_ 
+    err << "Insufficient arguments passed to eval.  Need " << argDefs_.count() 
       << ". Only " << args.size() << " were provided";
     throw runtime_error(err.str());
+  }
+
+  for(int i=0; i<argDefs_.count(); ++i)
+  {
+    const Number &arg = args.at(i);
+    if(argDefs_.type(i) == Number_t::Integer && arg.isDouble())
+    {
+      stringstream err;
+      err << "Argument " << i << " should be an integer, but a double ("
+        << double(arg) << ") was passed to eval()";
+      throw runtime_error(err.str());
+    }
   }
 
   return root_->eval(args);
@@ -596,31 +609,31 @@ Number_t XMLFunc::eval(const Args_t &args) const
 // XMLFunc::Op subclass methods
 ////////////////////////////////////////////////////////////////////////////////
 
-ConstOp::ConstOp(const XMLNode *xml, const ArgDefs &argDefs, NumberType_t type)
+ConstOp::ConstOp(const XMLNode *xml, const ArgDefs_t &argDefs, NumberType_t type)
 {
   const string &value = xml->attributeValue("value");
-  if( value.empty() ) invalid_xml("Const op must have a value attribute");
+  if( value.empty() ) INVALID_XML("Const op must have a value attribute");
 
-  if( xml->hasChildren() ) invalid_xml("Const op cannot have child ops");
+  if( xml->hasChildren() ) INVALID_XML("Const op cannot have child ops");
 
   string extra;
   if(type == Number_t::Double)
   {
     double dval(0.);
-    if( ! read_double( value, dval, extra ) ) invalid_xml("Invalid double value (",value,")");
+    if( ! read_double( value, dval, extra ) ) INVALID_XML("Invalid double value (" << value << ")");
     value_ = Number_t(dval);
   }
   else
   {
     long ival(0);
-    if( ! read_integer( value, ival, extra ) ) invalid_xml("Invalid integer value (",value,")");
+    if( ! read_integer( value, ival, extra ) ) INVALID_XML("Invalid integer value (" << value << ")");
     value_ = Number_t(ival);
   }
-  if( has_content(extra) ) invalid_xml("Extraneous data (",extra,") following ",value);
+  if( has_content(extra) ) INVALID_XML("Extraneous data (" << extra << ") following " << value);
 }
 
 
-ArgOp::ArgOp(const XMLNode *xml, const ArgDefs &argDefs)
+ArgOp::ArgOp(const XMLNode *xml, const ArgDefs_t &argDefs)
 {
   const string &index_attr = xml->attributeValue("index");
   const string &name_attr  = xml->attributeValue("name");
@@ -630,7 +643,7 @@ ArgOp::ArgOp(const XMLNode *xml, const ArgDefs &argDefs)
 
   if( hasIndex && hasName ) 
   {
-    invalid_xml("Arg op may only contain name or index attribute, not both");
+    INVALID_XML("Arg op may only contain name or index attribute, not both");
   }
   else if(hasIndex)
   {
@@ -638,19 +651,15 @@ ArgOp::ArgOp(const XMLNode *xml, const ArgDefs &argDefs)
     string extra;
 
     if( read_integer(index_attr,ival,extra) == false )
-      invalid_xml("index attribute is not an integer (",index_attr,")");
+      INVALID_XML("index attribute is not an integer (" << index_attr << ")");
 
     if(has_content(extra)) 
-      invalid_xml("index attribute contains extraneous data (",extra,")");
+      INVALID_XML("index attribute contains extraneous data (" << extra << ")");
 
     index_ = (size_t)ival;
 
-    if( ival<0 || index_ >= argDefs.size() )
-    {
-      stringstream err;
-      err << "Argument index " << index_ << " is out of range (0-" << argDefs.size()-1 << ")";
-      invalid_xml(err.str());
-    }
+    if( ival<0 || index_ >= argDefs.count() )
+      INVALID_XML("Argument index " << index_ << " is out of range (0-" << argDefs.count()-1 << ")");
   }
   else if(hasName)
   {
@@ -658,21 +667,21 @@ ArgOp::ArgOp(const XMLNode *xml, const ArgDefs &argDefs)
     string extra;
 
     if( read_token(name_attr,name,extra) == false )
-      invalid_xml("Arg name attribute must contain a non-empty string");
+      INVALID_XML("Arg name attribute must contain a non-empty string");
 
     if(has_content(extra)) 
-      invalid_xml("name attribute contains extraneous data (",extra,")");
+      INVALID_XML("name attribute contains extraneous data (" << extra << ")");
 
     index_ = argDefs.index(name);
   }
   else
   {
-    invalid_xml("Arg op must contain either name or index attribute");
+    INVALID_XML("Arg op must contain either name or index attribute");
   }
 }
 
 
-UnaryOp::UnaryOp(const XMLNode *xml, const ArgDefs &argDefs) : op_(NULL)
+UnaryOp::UnaryOp(const XMLNode *xml, const ArgDefs_t &argDefs) : op_(NULL)
 {
   const string &arg = xml->attributeValue("arg");
 
@@ -683,11 +692,11 @@ UnaryOp::UnaryOp(const XMLNode *xml, const ArgDefs &argDefs) : op_(NULL)
 
   if(numArg == 0)
   {
-    invalid_xml(xml->name(), " op requires an arg attribute or child element");
+    INVALID_XML(xml->name() << " op requires an arg attribute or child element");
   }
   else if(numArg>1)
   {
-    invalid_xml(xml->name(), " op cannot specify more than one arg attribute or child element");
+    INVALID_XML(xml->name() << " op cannot specify more than one arg attribute or child element");
   }
   else if(hasArg)
   {
@@ -699,7 +708,7 @@ UnaryOp::UnaryOp(const XMLNode *xml, const ArgDefs &argDefs) : op_(NULL)
   }
 }
 
-BinaryOp::BinaryOp(const XMLNode *xml, const ArgDefs &argDefs) : op1_(NULL), op2_(NULL)
+BinaryOp::BinaryOp(const XMLNode *xml, const ArgDefs_t &argDefs) : op1_(NULL), op2_(NULL)
 {
   const string &arg1 = xml->attributeValue("arg1");
   const string &arg2 = xml->attributeValue("arg2");
@@ -713,11 +722,11 @@ BinaryOp::BinaryOp(const XMLNode *xml, const ArgDefs &argDefs) : op1_(NULL), op2
 
   if(numArg < 2)
   {
-    invalid_xml(xml->name(), " op requires two arg attributes or child elements");
+    INVALID_XML(xml->name() << " op requires two arg attributes or child elements");
   }
   else if(numArg>2)
   {
-    invalid_xml(xml->name(), " op cannot specify more than two arg attribute or child element");
+    INVALID_XML(xml->name() << " op cannot specify more than two arg attribute or child element");
   }
   else if(hasArg1 && hasArg2)
   {
@@ -741,7 +750,7 @@ BinaryOp::BinaryOp(const XMLNode *xml, const ArgDefs &argDefs) : op1_(NULL), op2
   }
 }
 
-ListOp::ListOp(const XMLNode *xml, const ArgDefs &argDefs)
+ListOp::ListOp(const XMLNode *xml, const ArgDefs_t &argDefs)
 {
   const string &arg1 = xml->attributeValue("arg1");
   const string &arg2 = xml->attributeValue("arg2");
@@ -754,10 +763,10 @@ ListOp::ListOp(const XMLNode *xml, const ArgDefs &argDefs)
   if(hasArg2) ++numArg;
 
   if(hasArg2 && numArg<2)
-    invalid_xml(xml->name(), " op requires at least two arg attributes or child elements if arg2 is specified");
+    INVALID_XML(xml->name() << " op requires at least two arg attributes or child elements if arg2 is specified");
 
   if(numArg<1)
-    invalid_xml(xml->name(), " op requires at least one arg attribute or child element");
+    INVALID_XML(xml->name() << " op requires at least one arg attribute or child element");
 
   size_t j(0);
   for(size_t i=0; i<numArg; ++i)
@@ -770,7 +779,7 @@ ListOp::ListOp(const XMLNode *xml, const ArgDefs &argDefs)
   }
 }
 
-LogOp::LogOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs)
+LogOp::LogOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs)
 {
   double base(10.);
 
@@ -778,9 +787,9 @@ LogOp::LogOp(const XMLNode *xml, const ArgDefs &argDefs) : UnaryOp(xml,argDefs)
   if( base_str.empty() == false )
   {
     string extra;
-    if( read_double(base_str, base, extra) == false ) invalid_xml("Invalid base value (",base_str,") for log");
-    if( has_content(extra) )                          invalid_xml("Extraneous data found for base value");
-    if(base <= 0.)                                    invalid_xml("Base for log must be a positive value");
+    if( read_double(base_str, base, extra) == false ) INVALID_XML("Invalid base value (" << base_str << ") for log");
+    if( has_content(extra) )                          INVALID_XML("Extraneous data found for base value");
+    if(base <= 0.)                                    INVALID_XML("Base for log must be a positive value");
   }
 
   fac_ = 1. / log(base);
@@ -879,13 +888,6 @@ Number_t MultOp::eval(const Args_t &args) const
 // Support functions
 ////////////////////////////////////////////////////////////////////////////////
 
-void invalid_xml(const string &m1,const string &m2,const string &m3,const string &m4,const string &m5) 
-{
-  string err = "Invalid XMLFunc: ";
-  err.append(m1).append(m2).append(m3).append(m4).append(m5);
-  throw runtime_error(err);
-}
-
 // Determines if source is the name of a file or is already an XML string
 //   If the former, it loads the XML from the file
 //   If the latter, it simply returns the source string.
@@ -923,7 +925,7 @@ string strip_xml(const string &xml, const string &start, const string &end)
     if(start_del == string::npos) break;
 
     size_t end_del = rval.find(end,start_del);
-    if(end_del==string::npos) invalid_xml(start," is missing closing ",end);
+    if(end_del==string::npos) INVALID_XML(start << " is missing closing " << end);
 
     rval.erase(start_del, end_del + end.size() - start_del);
   }
@@ -961,7 +963,7 @@ bool has_content(const string &s)
 bool read_double(const string &s, double &val, string &tail)
 {
   string token;
-  if( read_token(s,token,tail) ) return false;
+  if( read_token(s,token,tail) == false ) return false;
 
   const char *a = token.c_str();
   char *b(NULL);
@@ -979,7 +981,7 @@ bool read_double(const string &s, double &val, string &tail)
 bool read_integer(const string &s, long &val, string &tail)
 {
   string token;
-  if( read_token(s,token,tail) ) return false;
+  if( read_token(s,token,tail) == false ) return false;
 
   const char *a = token.c_str();
   char *b(NULL);
@@ -1017,19 +1019,19 @@ bool read_token(const string &s, string &token, string &tail)
 
 
 // Constructs an XMLFunc::operation pointer from an attribute value
-Op_t *build_op(const string &xml, const ArgDefs &argDefs)
+Op_t *build_op(const string &xml, const ArgDefs_t &argDefs)
 {
   string token;
   string extra;
 
-  if( read_token(xml,token,extra) == false ) invalid_xml("empty argument value");
-  if( has_content(extra) )                   invalid_xml("extraneous data in arg value ('", extra,"')");
+  if( read_token(xml,token,extra) == false ) INVALID_XML("empty argument value");
+  if( has_content(extra) )                   INVALID_XML("extraneous data in arg value ('" << extra << "')");
 
   long ival;
   if( read_integer( token, ival, extra ) )
   {
     if(has_content(extra)) 
-      invalid_xml("Extraneous data found after integer value (",extra,")");
+      INVALID_XML("Extraneous data found after integer value (" << extra << ")");
 
     return new ConstOp(ival);
   }
@@ -1038,19 +1040,19 @@ Op_t *build_op(const string &xml, const ArgDefs &argDefs)
   if( read_double( token, dval, extra ) )
   {
     if(has_content(extra)) 
-      invalid_xml("Extraneous data found after double value (",extra,")");
+      INVALID_XML("Extraneous data found after double value (" << extra << ")");
 
     return new ConstOp(dval);
   }
 
   int index = argDefs.lookup(token);
-  if( index < 0 ) invalid_xml("Unrecognized argument name (",token,")");
+  if( index < 0 ) INVALID_XML("Unrecognized argument name (" << token << ")");
 
   return new ArgOp(index);
 }
 
 // Constructs an XMLFunc::operation pointer from an XMLNode
-Op_t *build_op(const XMLNode *xml, const ArgDefs &argDefs)
+Op_t *build_op(const XMLNode *xml, const ArgDefs_t &argDefs)
 {
   Op_t *rval=NULL;
 
@@ -1085,7 +1087,7 @@ Op_t *build_op(const XMLNode *xml, const ArgDefs &argDefs)
   else if ( name == "mult"    ) { rval = new  MultOp( xml,argDefs ); }
   else
   {
-    invalid_xml("Unrecognized operator name (",name,")");
+    INVALID_XML("Unrecognized operator name (" << name << ")");
   }
 
   return rval;

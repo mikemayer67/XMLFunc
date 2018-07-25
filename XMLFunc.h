@@ -34,13 +34,25 @@ class XMLFunc
 
       public:
         /// \brief default constructor (0.0)
-        Number(void)     : type_(Double),  ival_(0), dval_(0.0) {}
+        Number(void)             : type_(Double),  ival_(0), dval_(0.0) {}
         /// \brief integer constructor
-        Number(long v)   : type_(Integer), ival_(v), dval_(double(v)) {}
+        Number(long v)           : type_(Integer), ival_(v), dval_(double(v)) {}
+        /// \brief integer constructor
+        Number(int v)            : type_(Integer), ival_(v), dval_(double(v)) {}
+        /// \brief integer constructor
+        Number(short v)          : type_(Integer), ival_(v), dval_(double(v)) {}
+        /// \brief integer constructor
+        Number(unsigned long v)  : type_(Integer), ival_(v), dval_(double(v)) {}
+        /// \brief integer constructor
+        Number(unsigned int v)   : type_(Integer), ival_(v), dval_(double(v)) {}
+        /// \brief integer constructor
+        Number(unsigned short v) : type_(Integer), ival_(v), dval_(double(v)) {}
         /// \brief double constructor
-        Number(double v) : type_(Double),  ival_(int(v)), dval_(v) {}
+        Number(double v)         : type_(Double),  ival_(int(v)), dval_(v) {}
+        /// \brief double constructor
+        Number(float v)          : type_(Double),  ival_(int(v)), dval_(v) {}
         /// \brief copy constructor
-        Number(const Number &x) : type_(x.type_), ival_(x.ival_), dval_(x.dval_) {}
+        Number(const Number &x)  : type_(x.type_), ival_(x.ival_), dval_(x.dval_) {}
       
         /// \brief integer cast operator
         operator long(void)   const { return ival_;    }
@@ -78,7 +90,29 @@ class XMLFunc
         /// \endcond
     };
 
-    typedef std::vector<Number> Args_t;
+    class ArgDefs
+    {
+      public:
+        ArgDefs(void) {}
+
+        void add(Number::Type_t type, const std::string &name="");
+
+        int            count (void)  const { return int(types_.size()); }
+        Number::Type_t type  (int i) const { return types_.at(i);  }
+
+        int index(const std::string &name) const;
+        int lookup(const std::string &name) const;
+
+      private:
+        std::vector<Number::Type_t> types_;
+        std::map<std::string,int>   xref_;
+    };
+
+    class Args : public std::vector<Number>
+    {
+      public:
+        void add(const Number &v) { push_back(v); }
+    };
 
   public:
 
@@ -104,7 +138,7 @@ class XMLFunc
      * \warning The length of the list must match or exceed the number of arguments identified in
      *   the <arglist> element in the XML or a std::lenth_error exeption will be thrown.
      */
-    Number eval(const Args_t &args) const;
+    Number eval(const Args &args) const;
 
   public: // making these public allows Operation subclasses to exist outside XMLFunc scope
 
@@ -134,7 +168,7 @@ class XMLFunc
        * \param args is the list of argument values passed to the function being evaluated.
        */
       public:
-        virtual XMLFunc::Number eval(const Args_t &args) const = 0;
+        virtual XMLFunc::Number eval(const Args &args) const = 0;
     };
 
   private:
@@ -147,7 +181,7 @@ class XMLFunc
     ////////////////////////////////////////////////////////////
 
     Operation *root_;
-    size_t     numArgs_;
+    ArgDefs    argDefs_;
 
     /// \endcond
 };

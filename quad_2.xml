@@ -1,19 +1,19 @@
 <!-- Quadratic function using the plus option -->
 <arglist>
-  <arg name="a" type="double"/>
-  <arg name="b"/>
+  <arg name=a type=double/>
+  <arg name=b/>
   <arg/>
 </arglist>
 
 <div>
   <add>
-    <neg arg="b"/>
+    <neg arg=b/>
     <sqrt>
       <sub>
-        <pow>b 2</pow>
-        <mult>4<arg name="a"><arg index=2/></mult>
+        <pow arg1=b arg2=2/>
+        <mult arg2=4><arg name=a/><arg index=2/></mult>
       </sub>
     </sqrt>
-  </sub>
-  <mult>2 a</mult>
+  </add>
+  <mult arg2=2><arg name=a/></mult>
 </div>

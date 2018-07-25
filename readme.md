@@ -103,7 +103,8 @@ First and foremost, this is not a full/robust XML parser.
 - It does not support untagged data
   - the content between open/close pairs must be tagged
   - all raw data must appear in attributes
-- It requires all attribute values to be quoted (either \" or ' )
+- Aattribute values may or may not be quoted
+  - values with whitespace or non-alphanumeric values must be quoted
 - It does **not** recognize unicode (*there is no need for it* ).
 
 *I have not been able to figure out how to describe the legal XMLFunc
