@@ -18,6 +18,9 @@ class XMLFunc
 {
   public:
 
+    typedef std::map<std::string,size_t>  Xref_t;
+    typedef std::pair<std::string,size_t> XrefEntry_t;
+
     /*!
      * \class XMLFunc::Number
      * \brief integer or double value
@@ -90,29 +93,20 @@ class XMLFunc
         /// \endcond
     };
 
-    class ArgDefs
-    {
-      public:
-        ArgDefs(void) {}
-
-        void add(Number::Type_t type, const std::string &name="");
-
-        int            count (void)  const { return int(types_.size()); }
-        Number::Type_t type  (int i) const { return types_.at(i);  }
-
-        int index(const std::string &name) const;
-        int lookup(const std::string &name) const;
-
-      private:
-        std::vector<Number::Type_t> types_;
-        std::map<std::string,int>   xref_;
-    };
+    /*! 
+     * \class XMLFunc::Args
+     * \brief list of XML::Number objects, passed to eval calls
+     *
+     * This is nothing more than an extention of std::vector that adds the
+     * add() method as a synonym to push_bak
+     */
 
     class Args : public std::vector<Number>
     {
       public:
         void add(const Number &v) { push_back(v); }
     };
+
 
   public:
 
@@ -128,10 +122,16 @@ class XMLFunc
      */
     XMLFunc(const std::string &xml);
 
-    virtual ~XMLFunc() { if( root_ != NULL ) delete root_; }
+    virtual ~XMLFunc() 
+    { 
+      for(std::vector<Operation *>::iterator i=funcs_.begin(); i!=funcs_.end(); ++i)
+      {
+        delete *i;
+      }
+    }
 
     /*!
-     * \brief Invocation method
+     * \brief Invocation method when only one function is defined
      *
      * \param args - list of values being passed to the function.
      *
@@ -139,6 +139,26 @@ class XMLFunc
      *   the <arglist> element in the XML or a std::lenth_error exeption will be thrown.
      */
     Number eval(const Args &args) const;
+
+    /*!
+     * \brief Invocation method specifying function by function (0 based) index
+     *
+     * \param args - list of values being passed to the function.
+     *
+     * \warning The length of the list must match or exceed the number of arguments identified in
+     *   the <arglist> element in the XML or a std::lenth_error exeption will be thrown.
+     */
+    Number eval(size_t index, const Args &args) const;
+
+    /*!
+     * \brief Invocation method specifying function by name
+     *
+     * \param args - list of values being passed to the function.
+     *
+     * \warning The length of the list must match or exceed the number of arguments identified in
+     *   the <arglist> element in the XML or a std::lenth_error exeption will be thrown.
+     */
+    Number eval(const std::string &name, const Args &args) const;
 
   public: // making these public allows Operation subclasses to exist outside XMLFunc scope
 
@@ -171,17 +191,43 @@ class XMLFunc
         virtual XMLFunc::Number eval(const Args &args) const = 0;
     };
 
-  private:
-
     ////////////////////////////////////////////////////////////
-    // As all of the attributes are only used internally, no
-    //   doxygen style documentation is provided
+    // The ArgDefs class and all of attributes are only used 
+    //   internally, no doxygen style documentation is provided
     ////////////////////////////////////////////////////////////
     /// \cond PRIVATE
     ////////////////////////////////////////////////////////////
 
-    Operation *root_;
-    ArgDefs    argDefs_;
+  public: // to be useable by Operation and its subclasses
+
+    class ArgDefs
+    {
+      public:
+        ArgDefs(void) {}
+
+        void add(Number::Type_t type, const std::string &name="");
+
+        int            count (void)  const { return int(types_.size()); }
+        Number::Type_t type  (int i) const { return types_.at(i);  }
+
+        size_t index(const std::string &name) const;
+
+        std::pair<size_t,bool> find(const std::string &name) const;
+
+      private:
+
+        std::vector<Number::Type_t> types_;
+        Xref_t                      xref_;
+    };
+
+  private:
+
+    Number _eval(Operation *op, const Args &args) const;
+
+    ArgDefs                   argDefs_;
+    std::vector<Operation *>  funcs_;
+    Xref_t                    funcXref_;
+
 
     /// \endcond
 };

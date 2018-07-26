@@ -7,15 +7,32 @@
   <arg name="d" type="integer"/>
 </arglist>
 
-<div>
-  <sub>
-    <neg arg="b"/>
-    <sqrt>
-      <sub>
-        <pow arg1="b" arg2='2'/>
-        <mult arg1='4'><arg name="a"/><arg index='2'/></mult>
-      </sub>
-    </sqrt>
-  </sub>
-  <mult arg2='2' arg1='a'/>
-</div>
+<func>
+  <div>
+    <sub>
+      <neg arg="b"/>
+      <sqrt>
+        <sub>
+          <pow arg1="b" arg2='2'/>
+          <mult arg1='4'><arg name="a"/><arg index='2'/></mult>
+        </sub>
+      </sqrt>
+    </sub>
+    <mult arg2='2' arg1='a'/>
+  </div>
+</func>
+
+<func name="root2">
+  <div>
+    <add>
+      <neg arg="b"/>
+      <sqrt>
+        <sub>
+          <pow arg1="b" arg2='2'/>
+          <mult arg1='4'><arg name="a"/><arg index='2'/></mult>
+        </sub>
+      </sqrt>
+    </add>
+    <mult arg2='2' arg1='a'/>
+  </div>
+</func>

@@ -1,6 +1,6 @@
 # Overview
 
-XMLFunc is a C++ class that implments a mathematical function (*of fairly arbitrary complexity*) given a description of that function in XML.
+XMLFunc is a C++ class that implments a mathematical function or set of functions (*of fairly arbitrary complexity*) given a description of that function in XML. 
 
 To use this class, you must first understand the recognized XML tags, attributes, and values which define the function to be implemented AND the C++ interface for using the 
 generatedfunction.  We will start with the latter as that is the simpler of the two:
@@ -26,18 +26,67 @@ There are is a single constructors for an XMLFunc object:
 
 ### Invocation
 
-There is a single invocation method for an XMLFunc object:
+There are three invocation methods associated with an XMLFunc object.
 
-    XMLFunc::Number eval(const std::vector<XMLFunc::Number> &args) const
+The **first method** may be used if there is only one function defined in the XMLFunc object.
 
-**args** is a list of values being passed to the function for evaluation. 
+    XMLFunc::Number eval(XMLFunc::Args &args) const
 
-The length of the list must match or exceed the number of arguments identified
-in the \<arglist> element in the input XML having insufficient values results 
+- **args** is a list of values being passed to the function for evaluation. 
+- *See XMLFunc::Args and XMLFunc::Number below*
+
+The **second method** may always be used.
+
+    XMLFunc::Number eval(unsigned int index, XMLFunc::Args &args) const
+
+- **index** indicates which function to evaluate where 0 represents the first defined function
+- **args** is a list of values being passed to the function for evaluation. 
+
+The **third method** may be used with any function that was given a name in its definition.
+
+    XMLFunc::Number eval(const string &name, XMLFunc::Args &args) const
+
+- **index** indicates which function to evaluate where 0 represents the first defined function
+- **args** is a list of values being passed to the function for evaluation. 
+
+In all eval methods, the length of the list must match or exceed the number of arguments identified in the \<arglist> element in the input XML having insufficient values results 
 in a std::runtime_error being thrown.
 
-_See the description of the XMLFunc::Number class below._
+Because XMLFunc::Number (*see below*) can be cast to a double or long int, it is possible to
+assign the result of an eval() call directly to either an integer (int, long, short) or a
+double (or float).  Of course, if you do not know if the function will be returning an integer or real value, you may want to assign it to an XMLFunc::Number so that you can query the type.
 
+    int    iv = func.eval(args);
+    double dv = func.eval(args);
+    
+    XMLFunc::Number v = func.eval(args);
+    if( v.isInteger() ) {...}
+    else                {...}
+
+## XMLFunc::Args class
+
+The XMLFunc::Args class provides the list of arguments passed to a XMLFunc object's eval method.  This is a subclass of std::vector\<XML::Number>.  
+
+### Constructor
+
+There is a single constructor which takes no arguments.
+
+### Methods
+
+As a subclass of std::vector, all of the public vector methods apply to XML::Args
+
+This class provides a single overloaded method.  The **add** method is used for adding values to the argument list.  It wraps std::vector's push_back method, but allows arguments to be added as integers (int, long, or short) or floating point (double or float) without explicitly constructing an XML::Number object.
+
+### Example
+    int iv(0);
+    double dv(1.234);
+
+    XMLFunc::Args args;
+    
+    args.add(iv);
+    args.add(dv);
+    args.add(123);
+    args.add(456.789);
 
 ## XMLFunc::Number class
 
@@ -138,10 +187,38 @@ Each argument in the \<arglist> is defined with the \<arg> tag.  These must be s
 > \</arglist>
 > </pre>
 
+## Function Elements
+
+The remaining top level elements each define a unique function, which may or may not
+be associated with a function name.  All functions defined in the XML must take exactly
+the same argument list (*as defined above*).
+
+- They are identified by the \<func> tag
+- Theey are container elements
+  - each contains a single value element
+  - the value element may, in turn, contain other value elements, as appropriate
+- There is one optional attribute (*name*) defined for \<func>
+  - The name value must be unique across all \<func> elements
+  - If specified, this may be used to identify the function when invoking XMLFunc::eval 
+
+> **Example**
+> <pre>
+> \<arglist>...\</arglist>
+> \<!-- First function (index=0, *no-name*) -->
+> \<func>\<*ve*>...\</*ve*>\</func> 
+> \<!-- Second function (index=1, name='foo') -->
+> \<func name='foo'>\<*ve*>...\</*ve*>\</func>
+> \<!-- Third function (index=2, name='bar') -->
+> \<func name='bar'>\<*ve*>...\</*ve*>\</func> 
+> \<!-- Fourth function (index=3, *no-name*) -->
+> \<func>\<*ve*>...\</*ve*>\</func>  
+> </pre>
+
 ## Value Elements
 
-The remaining elements in the XML struture each has a value.  There can be 
-  only one top level value element, which may contain one or more value elements,
+The remaining elements are used within functin elements. Each represents either an
+  input or computed value.  There can be only one top level value element within 
+  each function element.  Each value element may contain one or more value elements,
   which may in turn contain one or more value elements, which may in turn ....
 
 There are two basic types of value elements: inputs and operators.  Inputs are

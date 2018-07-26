@@ -26,11 +26,15 @@ int main(int argc,char **argv)
     
     XMLFunc::Args args;
     args.add(1);
-    args.add(-3.);
+    args.add(-3.5);
     args.add(2);
     args.add(1234);
-    double x = q1.eval(args);
-    cout <<"q1() -> " << x << endl;
+    double x = q1.eval(0,args);
+    cout <<"q1(0) -> " << x << endl;
+    x = q1.eval(1,args);
+    cout <<"q1(1) -> " << x << endl;
+    x = q1.eval("root2",args);
+    cout <<"q1(root2) -> " << x << endl;
     x = q2.eval(args);
     cout <<"q2() -> " << x << endl;
   }
