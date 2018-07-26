@@ -101,7 +101,6 @@ A XMLFunc::Number object can be constructed from either an integer or a double.
     XMLFunc::Number dv(double);  // inherently double value
 
 Once constructed, the object retains knowledge of type type of number it represents.
-
 ### Public Enums
 
     enum XMLFunc::Number::Type_t { Integer, Double }
@@ -128,8 +127,7 @@ A XMLFunc::Number object can be either explicitly or implicitly cast to either a
 > XMLFunc::Number iv(1234);
 > XMLFunc::Number dv(12.34)<br/>
 > int i1 = int(iv);   // 1234
-> int i2 = int(dv);   // 12<br/>
-> double d1 = double(iv);   // 1234.0
+> int i2 = int(dv);   // 12<br/>> double d1 = double(iv);   // 1234.0
 > double d2 = double(dv);   // 12.34
 > </pre>
 
@@ -152,7 +150,7 @@ First and foremost, this is not a full/robust XML parser.
 - It does not support untagged data
   - the content between open/close pairs must be tagged
   - all raw data must appear in attributes
-- Aattribute values may or may not be quoted
+- Attribute values may or may not be quoted (using either \" or \')
   - values with whitespace or non-alphanumeric values must be quoted
 - It does **not** recognize unicode (*there is no need for it* ).
 
