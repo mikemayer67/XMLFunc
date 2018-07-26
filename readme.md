@@ -127,7 +127,8 @@ A XMLFunc::Number object can be either explicitly or implicitly cast to either a
 > XMLFunc::Number iv(1234);
 > XMLFunc::Number dv(12.34)<br/>
 > int i1 = int(iv);   // 1234
-> int i2 = int(dv);   // 12<br/>> double d1 = double(iv);   // 1234.0
+> int i2 = int(dv);   // 12<br/>
+> double d1 = double(iv);   // 1234.0
 > double d2 = double(dv);   // 12.34
 > </pre>
 
