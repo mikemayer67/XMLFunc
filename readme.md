@@ -155,28 +155,38 @@ First and foremost, this is not a full/robust XML parser.
   - values with whitespace or non-alphanumeric values must be quoted
 - It does **not** recognize unicode (*there is no need for it* ).
 
+There are three categories of elements recognized by XMLFunc
+
+- Argument Lists
+- Function Elements
+- Value Elements
+
 *I have not been able to figure out how to describe the legal XMLFunc
 syntax using XSchema due to the recursive nature of the value elements.
 If someone can tip me off how to implement an "is-a" definition, I will add
 the appropriate .xsd file to this project.*
 
-## Argument List
+## Argument Lists
 
-The first XML element must define the arguments that will be passed to the XMLFunc
-eval method.  
+Argument lists define the arguments that must be passed to a function when evaluating it with XMLFunc::eval().    
 
-- It is identified by the \<arglist> tag
-- It is a container element whose contents define the names and types of each argument.
-- There are no attributes defined for \<arglist>
+- Identified by the \<arglist> tag
+- Container element containing one or more \<arg> elements
+- No attributes are defined for \<arglist>
+- May be specified at the root level of the XML or as first child of a function element
+  - when specified at root level, applies to all subsequenty functions
+  - when specified in a function element, only applies to that function 
+  - lists defined in a function override lists defined at root level
 
-Each argument in the \<arglist> is defined with the \<arg> tag.  These must be specified in the order they will be passed to XMLFunc::eval()
+Each argument in the \<arglist> is defined with the \<arg> tag.  
 
     \<arg name=var-name type=var-type/>
 
-- The optional type attribute may have a value of either *integer* or *double*
-- The optional name attribute may be used to reference arguments in an operation element
-  - var-name is any string consisting of alphanumeric characters
-  - var-name cannot start with a digit
+- Must be specified in the order they will be passed to XMLFunc::eval()
+- Optional type attribute may have a value of either *integer* or *double*
+- Optional name attribute may be used to reference arguments in an operation element
+  - var-name is any string consisting of alphanumeric characters, but cannot start with a digit
+
 
 > **Example**<br/>
 > <pre>
@@ -188,17 +198,16 @@ Each argument in the \<arglist> is defined with the \<arg> tag.  These must be s
 
 ## Function Elements
 
-The remaining top level elements each define a unique function, which may or may not
-be associated with a function name.  All functions defined in the XML must take exactly
-the same argument list (*as defined above*).
+Function elements define a function that can be evaluated with XMLFunc::eval().
 
-- They are identified by the \<func> tag
-- Theey are container elements
-  - each contains a single value element
+- Identified by the \<func> tag
+- Optional name attribute may be used to identify the function when invoking XMLFunc::eval
+  - must be unique across all \<func> elements
+- First child element may be an argument list
+  - required if there is no argumet list defined at root level **prior** to the function in the XML
+  - overrides any root level argument list
+- Must contain a exactly one value element
   - the value element may, in turn, contain other value elements, as appropriate
-- There is one optional attribute (*name*) defined for \<func>
-  - The name value must be unique across all \<func> elements
-  - If specified, this may be used to identify the function when invoking XMLFunc::eval 
 
 > **Example**
 > <pre>
@@ -215,15 +224,11 @@ the same argument list (*as defined above*).
 
 ## Value Elements
 
-The remaining elements are used within functin elements. Each represents either an
-  input or computed value.  There can be only one top level value element within 
-  each function element.  Each value element may contain one or more value elements,
-  which may in turn contain one or more value elements, which may in turn ....
+Value elements represent either an input or a computed value. 
 
-There are two basic types of value elements: inputs and operators.  Inputs are
-  always leaf nodes in the XML.  Operators may be leaf nodes (if all of its 
-  operands are specified via attributes) or, more often, as composite elements 
-  containing one or more other value elements.  
+- input values are always leaf nodes in the XML
+- computed values (*a.k.a. operator elements*) may be leaf nodes or as composite elements 
+  containing one or more other value elements.
   
 > **value** := input | operator
 

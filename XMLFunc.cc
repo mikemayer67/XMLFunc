@@ -49,7 +49,6 @@ bool   read_token   (const string &s, string &token, string &tail);
 OpPtr_t build_op(const string &arg,  const ArgDefs_t &);
 OpPtr_t build_op(const XMLNode *xml, const ArgDefs_t &);
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Support classes
 ////////////////////////////////////////////////////////////////////////////////
@@ -139,21 +138,52 @@ pair<size_t,bool> XMLFunc::ArgDefs::find(const string &name) const
 class ConstOp : public XMLFunc::Operation
 {
   public:
-    ConstOp(const XMLNode *xml, const ArgDefs_t &, NumberType_t);
+
+    static ConstOp *build(const XMLNode *xml, const ArgDefs_t &argDefs)
+    {
+      ConstOp *rval(NULL);
+
+      string name = xml->name();
+      if      ( name == "double"  ) { rval = new ConstOp( xml,argDefs, Number_t::Double  ); }
+      else if ( name == "float"   ) { rval = new ConstOp( xml,argDefs, Number_t::Double  ); }
+      else if ( name == "real"    ) { rval = new ConstOp( xml,argDefs, Number_t::Double  ); }
+      else if ( name == "integer" ) { rval = new ConstOp( xml,argDefs, Number_t::Integer ); }
+      else if ( name == "int"     ) { rval = new ConstOp( xml,argDefs, Number_t::Integer ); }
+
+      return rval;
+    }
+
     ConstOp(long v)   : value_(v) {}
     ConstOp(double v) : value_(v) {}
+
     Number_t eval(const Args_t &args) const { return value_; }
+
   private:
+
+    ConstOp(const XMLNode *xml, const ArgDefs_t &, NumberType_t);
+
     Number_t value_;
 };
 
 class ArgOp : public XMLFunc::Operation
 {
   public:
-    ArgOp(const XMLNode *xml, const ArgDefs_t &);
+
+    static ArgOp *build(const XMLNode *xml, const ArgDefs_t &args)
+    {
+      ArgOp *rval(NULL);
+      if( xml->name() == "arg") rval = new ArgOp(xml,args);
+      return rval;
+    }
+
     ArgOp(size_t i) : index_(i) {}
+
     Number_t eval(const Args_t &args) const { return args.at(index_); }
+
   private:
+
+    ArgOp(const XMLNode *xml, const ArgDefs_t &);
+
     size_t index_;
 };
 
@@ -161,18 +191,140 @@ class ArgOp : public XMLFunc::Operation
 class UnaryOp : public XMLFunc::Operation
 {
   public:
-    UnaryOp(const XMLNode *xml, const ArgDefs_t &);
+
+    typedef enum { NEG, ABS, SIN, COS, TAN, ASIN, ACOS, ATAN, DEG, RAD, SQRT, EXP, LN, CHILD } Type_t;
+
     ~UnaryOp() { if(op_!=NULL) delete op_; }
+
+    static UnaryOp *build(const XMLNode *xml, const ArgDefs_t &args)
+    {
+      UnaryOp *rval(NULL);
+
+      string name = xml->name();
+      if      ( name == "neg"  ) rval = new UnaryOp(xml,args,NEG);
+      else if ( name == "abs"  ) rval = new UnaryOp(xml,args,ABS);
+      else if ( name == "sin"  ) rval = new UnaryOp(xml,args,SIN);
+      else if ( name == "cos"  ) rval = new UnaryOp(xml,args,COS);
+      else if ( name == "tan"  ) rval = new UnaryOp(xml,args,TAN);
+      else if ( name == "asin" ) rval = new UnaryOp(xml,args,ASIN);
+      else if ( name == "acos" ) rval = new UnaryOp(xml,args,ACOS);
+      else if ( name == "atan" ) rval = new UnaryOp(xml,args,ATAN);
+      else if ( name == "deg"  ) rval = new UnaryOp(xml,args,DEG);
+      else if ( name == "rad"  ) rval = new UnaryOp(xml,args,RAD);
+      else if ( name == "sqrt" ) rval = new UnaryOp(xml,args,SQRT);
+      else if ( name == "exp"  ) rval = new UnaryOp(xml,args,EXP);
+      else if ( name == "ln"   ) rval = new UnaryOp(xml,args,LN);
+
+      return rval;
+    }
+
+    Number_t eval(const Args_t &args) const
+    {
+      static double deg_to_rad = atan(1.0)/45.;
+      static double rad_to_deg = 1./deg_to_rad;
+
+      Number_t v = op_->eval(args);
+
+      Number_t rval;
+      switch(type_)
+      {
+        case NEG:  rval = v.negate();             break;
+        case ABS:  rval = v.abs();                break;
+
+        case SIN:  rval = sin(  double(v) );      break;
+        case COS:  rval = cos(  double(v) );      break;
+        case TAN:  rval = tan(  double(v) );      break;
+        case ASIN: rval = asin( double(v) );      break;
+        case ACOS: rval = acos( double(v) );      break;
+        case ATAN: rval = atan( double(v) );      break;
+        case SQRT: rval = sqrt( double(v) );      break;
+        case EXP:  rval = exp(  double(v) );      break;
+        case LN:   rval = log(  double(v) );      break;
+
+        case DEG:  rval = double(v) * rad_to_deg; break;
+        case RAD:  rval = double(v) * deg_to_rad; break;
+
+        case CHILD: 
+          throw logic_error("Child class of UnaryOp missing override of eval method"); 
+          break;
+      }
+      return rval;
+    }
+
   protected:
+
+    UnaryOp(const XMLNode *, const ArgDefs_t &, Type_t);
+
+    Type_t  type_;
     OpPtr_t op_;
 };
 
 class BinaryOp : public XMLFunc::Operation
 {
   public:
-    BinaryOp(const XMLNode *xml, const ArgDefs_t &);
-    ~BinaryOp() { if(op1_!=NULL) delete op1_; if(op2_!=NULL) delete op2_; }
+
+    typedef enum { SUB, DIV, MOD, POW, ATAN2 } Type_t;
+
+    ~BinaryOp() 
+    {
+      if(op1_!=NULL) delete op1_;
+      if(op2_!=NULL) delete op2_; 
+    }
+
+    static BinaryOp *build(const XMLNode *xml, const ArgDefs_t &args)
+    {
+      BinaryOp *rval(NULL);
+
+      string name = xml->name();
+      if      ( name == "sub"   ) rval = new BinaryOp(xml,args,SUB);
+      else if ( name == "div"   ) rval = new BinaryOp(xml,args,DIV);
+      else if ( name == "mod"   ) rval = new BinaryOp(xml,args,MOD);
+      else if ( name == "pow"   ) rval = new BinaryOp(xml,args,POW);
+      else if ( name == "atan2" ) rval = new BinaryOp(xml,args,ATAN2);
+
+      return rval;
+    }
+
+    Number_t eval(const Args_t &args) const
+    {
+      Number_t v1 = op1_->eval(args);
+      Number_t v2 = op2_->eval(args);
+
+      bool isInteger = v1.isInteger() && v2.isInteger();
+
+      Number_t rval;
+      switch(type_)
+      {
+        case SUB: 
+          if(isInteger) rval = Number_t( long(v1)   - long(v2)   );
+          else          rval = Number_t( double(v1) - double(v2) ); 
+          break;
+
+        case DIV: 
+          if(isInteger) rval = Number_t( long(v1)   / long(v2)   );
+          else          rval = Number_t( double(v1) / double(v2) ); 
+          break;
+
+        case MOD:
+          if(isInteger) rval = Number_t( long(v1) % long(v2) );
+          else          rval = Number_t( std::fmod(double(v1),double(v2)) );
+
+        case POW: 
+          rval = Number_t( pow( double(v1), double(v2) ) );
+          break;
+
+        case ATAN2: 
+          rval = Number_t( atan2( double(v1), double(v2)) );
+          break;
+      }
+      return rval;
+    }
+
   protected:
+
+    BinaryOp(const XMLNode *xml, const ArgDefs_t &, Type_t);
+
+    Type_t  type_;
     OpPtr_t op1_;
     OpPtr_t op2_;
 };
@@ -180,201 +332,82 @@ class BinaryOp : public XMLFunc::Operation
 class ListOp : public XMLFunc::Operation
 {
   public:
-    ListOp(const XMLNode *xml, const ArgDefs_t &);
-    ~ListOp() 
-    { for(OpList_t::iterator i=ops_.begin(); i!=ops_.end(); ++i) delete *i; }
+
+    typedef enum { ADD, MULT } Type_t;
+
+    ~ListOp() { for(OpList_t::iterator i=ops_.begin(); i!=ops_.end(); ++i) delete *i; }
+
+    static ListOp *build(const XMLNode *xml, const ArgDefs_t &argDefs)
+    {
+      ListOp *rval(NULL);
+
+      string name = xml->name();
+      if      ( name == "add"  ) rval = new ListOp(xml,argDefs,ADD);
+      else if ( name == "mult" ) rval = new ListOp(xml,argDefs,MULT);
+
+      return rval;
+    }
+
+    Number_t eval(const Args_t &args) const
+    {
+      long   ival(0);
+      double dval(0);
+
+      switch(type_)
+      {
+        case ADD:  ival=0; dval=0.0;  break;
+        case MULT: ival=1; dval=1.0;  break;
+      }
+
+      bool isInteger = true;
+
+      for(OpList_t::const_iterator op = ops_.begin(); op!=ops_.end(); ++op)
+      {
+        Number_t v = (*op)->eval(args);
+
+        isInteger = isInteger && v.isInteger();
+
+        switch(type_)
+        {
+          case ADD:   ival += long(v);  dval += double(v);  break;
+          case MULT:  ival *= long(v);  dval *= double(v);  break;
+        }
+      }
+
+      return ( isInteger ? Number_t(ival) : Number_t(dval) );
+    }
+
   protected:
+
+    ListOp(const XMLNode *xml, const ArgDefs_t &, Type_t);
+
+    Type_t   type_;
     OpList_t ops_;
 };
 
-class NegOp : public UnaryOp
-{
-  public:
-    NegOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
 
-    Number_t eval(const Args_t &args) const
-    { return op_->eval(args).negate(); }
-};
 
-class SinOp : public UnaryOp
-{
-  public: 
-    SinOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    { return sin(double(op_->eval(args))); }
-};
-
-class CosOp : public UnaryOp
-{
-  public:
-    CosOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    { return cos(double(op_->eval(args))); }
-};
-
-class TanOp : public UnaryOp
-{
-  public:
-    TanOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    { return tan(double(op_->eval(args))); }
-};
-
-class AsinOp : public UnaryOp
-{
-  public:
-    AsinOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    { return asin(double(op_->eval(args))); }
-};
-
-class AcosOp : public UnaryOp
-{
-  public:
-    AcosOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    { return acos(double(op_->eval(args))); }
-};
-
-class AtanOp : public UnaryOp
-{
-  public:
-    AtanOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    { return atan(double(op_->eval(args))); }
-};
-
-class DegOp : public UnaryOp
-{
-  public: 
-    DegOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    {
-      static double f = 45./atan(1.0);
-      return Number_t( f * double(op_->eval(args)) );
-    }
-};
-
-class RadOp : public UnaryOp
-{
-  public:
-    RadOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    {
-      static double f = atan(1.0)/45.;
-      return Number_t( f * double(op_->eval(args)) );
-    }
-};
-
-class AbsOp : public UnaryOp
-{
-  public:
-    AbsOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    { return op_->eval(args).abs(); }
-};
-
-class SqrtOp : public UnaryOp
-{
-  public:
-    SqrtOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    { return Number_t( sqrt(double(op_->eval(args))) ); }
-};
-
-class ExpOp : public UnaryOp
-{
-  public:
-    ExpOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    { return Number_t( exp(double(op_->eval(args))) ); }
-};
-
-class LnOp : public UnaryOp
-{
-  public: 
-    LnOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const
-    { return Number_t( log(double(op_->eval(args))) ); }
-};
 
 class LogOp : public UnaryOp
 {
   public:
-    LogOp(const XMLNode *xml, const ArgDefs_t &); Number_t eval(const Args_t &args) const
+
+    static LogOp *build(const XMLNode *xml, const ArgDefs_t &args)
+    {
+      LogOp *rval(NULL);
+      if( xml->name() == "log" ) rval = new LogOp(xml,args);
+      return rval;
+    }
+
+    Number_t eval(const Args_t &args) const
     {
       return Number_t( fac_ * log( double(op_->eval(args))) );
     }
   private:
+
+    LogOp(const XMLNode *xml, const ArgDefs_t &); 
+
     double fac_;
-};
-
-class SubOp : public BinaryOp
-{
-  public: 
-    SubOp(const XMLNode *xml, const ArgDefs_t &argDefs) : BinaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const;
-};
-
-class DivOp : public BinaryOp
-{
-  public: 
-    DivOp(const XMLNode *xml, const ArgDefs_t &argDefs) : BinaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const;
-};
-
-class PowOp : public BinaryOp
-{
-  public: 
-    PowOp(const XMLNode *xml, const ArgDefs_t &argDefs) : BinaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const;
-};
-
-class ModOp : public BinaryOp
-{
-  public: 
-    ModOp(const XMLNode *xml, const ArgDefs_t &argDefs) : BinaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const;
-};
-
-class Atan2Op : public BinaryOp
-{
-  public: 
-    Atan2Op(const XMLNode *xml, const ArgDefs_t &argDefs) : BinaryOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const;
-};
-
-class AddOp : public ListOp
-{
-  public: 
-    AddOp(const XMLNode *xml, const ArgDefs_t &argDefs) : ListOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const;
-};
-
-class MultOp : public ListOp
-{
-  public: 
-    MultOp(const XMLNode *xml, const ArgDefs_t &argDefs) : ListOp(xml,argDefs) {}
-
-    Number_t eval(const Args_t &args) const;
 };
 
 
@@ -410,7 +443,7 @@ XMLNode *XMLNode::build(string &xml, XMLNode *parent)
     ++start_name;
   }
 
-  size_t end_name = xml.find_first_not_of(alpha,start_name);
+  size_t end_name = xml.find_first_not_of(alphanum,start_name);
   if( end_name==start_name  ) INVALID_XML("missing tag name");
   if( end_name==string::npos) INVALID_XML("tag is missing closing '>'");
 
@@ -537,30 +570,16 @@ XMLNode *XMLNode::build(string &xml, XMLNode *parent)
 // XMLFunc methods
 ////////////////////////////////////////////////////////////////////////////////
 
-// XMLFunc destructor
-
-// XMLFunc constructor
-
-XMLFunc::XMLFunc(const string &src)
+void populate(ArgDefs_t &argDefs, const XMLNode *xml)
 {
-  string raw_xml = load_xml(src);
-  raw_xml = strip_xml(raw_xml,"<?xml","?>"); // remove declaration
-  raw_xml = strip_xml(raw_xml,"<!--","-->"); // remove comments
+  size_t numArgs = xml->numChildren();
 
-  transform( raw_xml.begin(), raw_xml.end(), raw_xml.begin(), ::tolower );
-
-  // Extract the arg definition list
-  
-  XMLNode *arglist = XMLNode::build(raw_xml);
-  if(arglist==NULL)                INVALID_XML("empty");
-  if(arglist->name() != "arglist") INVALID_XML("missing <arglist> element");
-
-  size_t numArgs = arglist->numChildren();
   if(numArgs==0)  INVALID_XML("<arglist> is empty");
 
+  argDefs.clear();
   for(size_t i=0; i<numArgs; ++i)
   {
-    const XMLNode *arg = arglist->child(i);
+    const XMLNode *arg = xml->child(i);
     if(arg->name() != "arg") INVALID_XML("<arglist> may only contain <arg> elements");
 
     NumberType_t type = Number_t::Double;
@@ -578,37 +597,82 @@ XMLFunc::XMLFunc(const string &src)
 
     const string &name = arg->attributeValue("name");
 
-    if( name.empty() ) { argDefs_.add(type); }
-    else               { argDefs_.add(type,name); }
+    if( name.empty() ) { argDefs.add(type); }
+    else               { argDefs.add(type,name); }
   }
+}
 
-  // Extract the function defintions
+// XMLFunc constructor
+
+XMLFunc::XMLFunc(const string &src)
+{
+  string raw_xml = load_xml(src);
+  raw_xml = strip_xml(raw_xml,"<?xml","?>"); // remove declaration
+  raw_xml = strip_xml(raw_xml,"<!--","-->"); // remove comments
+
+  transform( raw_xml.begin(), raw_xml.end(), raw_xml.begin(), ::tolower );
+
+  ArgDefs_t sharedArgDefs;
 
   while(has_content(raw_xml))
   {
     XMLNode *xml = XMLNode::build(raw_xml);
-    if(xml==NULL)               INVALID_XML("missing valid root value element");
-    if(xml->name() != "func")   INVALID_XML("only <func> elements may follow <arglist>");
-    if(xml->numChildren() != 1) INVALID_XML("<func> elements must contain exactly one child element");
+    if( xml==NULL ) INVALID_XML("Failed to parse root level element");
 
-    OpPtr_t func = build_op(xml->child(0),argDefs_);
-    funcs_.push_back(func);
+    string tag = xml->name();
 
-    if( xml->hasAttribute("name") )
+    if( tag == "arglist" )
     {
-      string name = xml->attributeValue("name");
-      size_t index = funcs_.size() - 1;
+      populate(sharedArgDefs,xml);
+    }
+    else if( tag == "func" )
+    {
+      size_t numChildren = xml->numChildren();
+      if( numChildren == 1 )
+      {
+        if(sharedArgDefs.empty()) 
+          INVALID_XML("<func> must have <arglist> child as there is no root level <arglist>");
 
-      XrefEntry_t entry(name,index);
-      
-      pair< Xref_t::iterator, bool> rc = funcXref_.insert(entry);
+        OpPtr_t func = build_op( xml->child(0), sharedArgDefs );
+        funcs_.push_back( Function(func, sharedArgDefs) );
+      }
+      else if(numChildren == 2 )
+      {
+        const XMLNode *arglist = xml->child(0);
+        if( arglist->name() != "arglist" ) 
+          INVALID_XML("<arglist> must be first element in <func> if there is more than one child element");
 
-      if(rc.second == false) INVALID_XML("function name " << name << " can only be used once");
+        ArgDefs_t argDefs;
+        populate(argDefs,arglist);
+
+        OpPtr_t func = build_op( xml->child(1), argDefs );
+
+        funcs_.push_back( Function(func, argDefs) );
+      }
+      else
+      {
+        INVALID_XML("<func> must one child element, with an optional arg list");
+      }
+
+      if( xml->hasAttribute("name") )
+      {
+        string name = xml->attributeValue("name");
+        size_t index = funcs_.size() - 1;
+
+        XrefEntry_t entry(name,index);
+
+        pair< Xref_t::iterator, bool> rc = funcXref_.insert(entry);
+
+        if(rc.second == false) INVALID_XML("function name " << name << " can only be used once");
+      }
+    }
+    else
+    {
+      INVALID_XML("Only <func> and <arglist> elements may exist at root level");
     }
   }
-  if(has_content(raw_xml)) INVALID_XML("extraneous data found");
-  if(funcs_.empty()) INVALID_XML("contains no <func> elements");
 
+  if(funcs_.empty()) INVALID_XML("contains no <func> elements");
 }
 
 Number_t XMLFunc::eval(const Args_t &args) const
@@ -647,20 +711,20 @@ Number_t XMLFunc::eval(const string &name,const Args_t &args) const
   return _eval( funcs_.at(index), args);
 }
 
-Number_t XMLFunc::_eval(OpPtr_t op, const Args_t &args) const
+Number_t XMLFunc::_eval(const Function &f, const Args_t &args) const
 {
-  if( args.size() < argDefs_.count() )
+  if( args.size() < f.argDefs.count() )
   {
     stringstream err;
-    err << "Insufficient arguments passed to eval.  Need " << argDefs_.count() 
+    err << "Insufficient arguments passed to eval.  Need " << f.argDefs.count()
       << ". Only " << args.size() << " were provided";
     throw runtime_error(err.str());
   }
 
-  for(int i=0; i<argDefs_.count(); ++i)
+  for(int i=0; i<f.argDefs.count(); ++i)
   {
     const Number &arg = args.at(i);
-    if(argDefs_.type(i) == Number_t::Integer && arg.isDouble())
+    if(f.argDefs.type(i) == Number_t::Integer && arg.isDouble())
     {
       stringstream err;
       err << "Argument " << i << " should be an integer, but a double ("
@@ -669,7 +733,7 @@ Number_t XMLFunc::_eval(OpPtr_t op, const Args_t &args) const
     }
   }
 
-  return op->eval(args);
+  return f.root->eval(args);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -748,7 +812,8 @@ ArgOp::ArgOp(const XMLNode *xml, const ArgDefs_t &argDefs)
 }
 
 
-UnaryOp::UnaryOp(const XMLNode *xml, const ArgDefs_t &argDefs) : op_(NULL)
+UnaryOp::UnaryOp(const XMLNode *xml, const ArgDefs_t &argDefs, Type_t type) 
+  : type_(type), op_(NULL)
 {
   const string &arg = xml->attributeValue("arg");
 
@@ -758,24 +823,16 @@ UnaryOp::UnaryOp(const XMLNode *xml, const ArgDefs_t &argDefs) : op_(NULL)
   if(hasArg) ++numArg;
 
   if(numArg == 0)
-  {
     INVALID_XML(xml->name() << " op requires an arg attribute or child element");
-  }
-  else if(numArg>1)
-  {
+  if(numArg>1)
     INVALID_XML(xml->name() << " op cannot specify more than one arg attribute or child element");
-  }
-  else if(hasArg)
-  {
-    op_ = build_op(arg,argDefs);
-  }
-  else
-  {
-    op_ = build_op(xml->child(0),argDefs);
-  }
+
+  if(hasArg) op_ = build_op(arg,argDefs);
+  else       op_ = build_op(xml->child(0),argDefs);
 }
 
-BinaryOp::BinaryOp(const XMLNode *xml, const ArgDefs_t &argDefs) : op1_(NULL), op2_(NULL)
+BinaryOp::BinaryOp(const XMLNode *xml, const ArgDefs_t &argDefs, Type_t type) 
+  : type_(type), op1_(NULL), op2_(NULL)
 {
   const string &arg1 = xml->attributeValue("arg1");
   const string &arg2 = xml->attributeValue("arg2");
@@ -817,7 +874,7 @@ BinaryOp::BinaryOp(const XMLNode *xml, const ArgDefs_t &argDefs) : op1_(NULL), o
   }
 }
 
-ListOp::ListOp(const XMLNode *xml, const ArgDefs_t &argDefs)
+ListOp::ListOp(const XMLNode *xml, const ArgDefs_t &argDefs,Type_t type) : type_(type)
 {
   const string &arg1 = xml->attributeValue("arg1");
   const string &arg2 = xml->attributeValue("arg2");
@@ -846,7 +903,7 @@ ListOp::ListOp(const XMLNode *xml, const ArgDefs_t &argDefs)
   }
 }
 
-LogOp::LogOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs)
+LogOp::LogOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs,CHILD)
 {
   double base(10.);
 
@@ -860,95 +917,6 @@ LogOp::LogOp(const XMLNode *xml, const ArgDefs_t &argDefs) : UnaryOp(xml,argDefs
   }
 
   fac_ = 1. / log(base);
-}
-
-Number_t SubOp::eval(const Args_t &args) const
-{
-  Number_t v1 = op1_->eval(args);
-  Number_t v2 = op2_->eval(args);
-
-  return 
-    ( v1.isInteger() && v2.isInteger() )
-    ? Number_t( long(v1) - long(v2) )
-    : Number_t( double(v1) - double(v2) ) ;
-}
-
-Number_t DivOp::eval(const Args_t &args) const
-{
-  Number_t v1 = op1_->eval(args);
-  Number_t v2 = op2_->eval(args);
-
-  return 
-    ( v1.isInteger() && v2.isInteger() )
-    ? Number_t( long(v1) / long(v2) )
-    : Number_t( double(v1) / double(v2) ) ;
-}
-
-Number_t PowOp::eval(const Args_t &args) const
-{
-  Number_t v1 = op1_->eval(args);
-  Number_t v2 = op2_->eval(args);
-
-  return Number_t( pow( double(v1), double(v2) ) );
-}
-
-Number_t ModOp::eval(const Args_t &args) const
-{
-  Number_t v1 = op1_->eval(args);
-  Number_t v2 = op2_->eval(args);
-
-  return 
-    ( v1.isInteger() && v2.isInteger() )
-    ? Number_t( long(v1) % long(v2) )
-  : Number_t( std::fmod(double(v1),double(v2)) ) ;
-}
-
-Number_t Atan2Op::eval(const Args_t &args) const
-{
-  Number_t v1 = op1_->eval(args);
-  Number_t v2 = op2_->eval(args);
-
-  return Number_t( atan2( double(v1), double(v2) ) );
-}
-
-Number_t AddOp::eval(const Args_t &args) const
-{
-  long   isum(0);
-  double dsum(0.);
-
-  bool isInteger = true;
-
-  for(OpList_t::const_iterator op=ops_.begin(); op!=ops_.end(); ++op)
-  {
-    Number_t t = (*op)->eval(args);
-
-    isInteger = isInteger && t.isInteger();
-
-    isum += long(t);
-    dsum += double(t);
-  }
-
-  return isInteger ? Number_t(isum) : Number_t(dsum);
-}
-
-Number_t MultOp::eval(const Args_t &args) const
-{
-  long   iprod(1);
-  double dprod(1.);
-
-  bool isInteger = true;
-
-  for(vector<OpPtr_t >::const_iterator op = ops_.begin(); op != ops_.end(); ++op)
-  {
-    Number_t t = (*op)->eval(args);
-
-    isInteger = isInteger && t.isInteger();
-
-    iprod *= long(t);
-    dprod *= double(t);
-  }
-
-  return isInteger ? Number_t(iprod) : Number_t(dprod);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1085,6 +1053,25 @@ bool read_token(const string &s, string &token, string &tail)
 }
 
 
+// Constructs an XMLFunc::operation pointer from an XMLNode
+OpPtr_t build_op(const XMLNode *xml, const ArgDefs_t &argDefs)
+{
+  OpPtr_t rval=NULL;
+
+  if( rval == NULL ) rval =  ConstOp::build( xml, argDefs );
+  if( rval == NULL ) rval =    ArgOp::build( xml, argDefs );
+  if( rval == NULL ) rval =  UnaryOp::build( xml, argDefs );
+  if( rval == NULL ) rval = BinaryOp::build( xml, argDefs );
+  if( rval == NULL ) rval =   ListOp::build( xml, argDefs );
+  if( rval == NULL ) rval =    LogOp::build( xml, argDefs );
+
+  if( rval == NULL) 
+    INVALID_XML("Unrecognized operator name (" << xml->name() << ")");
+
+  return rval;
+}
+
+
 // Constructs an XMLFunc::operation pointer from an attribute value
 OpPtr_t build_op(const string &xml, const ArgDefs_t &argDefs)
 {
@@ -1116,47 +1103,5 @@ OpPtr_t build_op(const string &xml, const ArgDefs_t &argDefs)
   if( rc.second == false ) INVALID_XML("Unrecognized argument name (" << token << ")");
 
   return new ArgOp(rc.first);
-}
-
-// Constructs an XMLFunc::operation pointer from an XMLNode
-OpPtr_t build_op(const XMLNode *xml, const ArgDefs_t &argDefs)
-{
-  OpPtr_t rval=NULL;
-
-  string name=xml->name();
-
-  if      ( name == "double"  ) { rval = new ConstOp( xml,argDefs, Number_t::Double  ); }
-  else if ( name == "float"   ) { rval = new ConstOp( xml,argDefs, Number_t::Double  ); }
-  else if ( name == "real"    ) { rval = new ConstOp( xml,argDefs, Number_t::Double  ); }
-  else if ( name == "integer" ) { rval = new ConstOp( xml,argDefs, Number_t::Integer ); }
-  else if ( name == "int"     ) { rval = new ConstOp( xml,argDefs, Number_t::Integer ); }
-  else if ( name == "arg"     ) { rval = new   ArgOp( xml,argDefs ); }
-  else if ( name == "neg"     ) { rval = new   NegOp( xml,argDefs ); }
-  else if ( name == "sin"     ) { rval = new   SinOp( xml,argDefs ); }
-  else if ( name == "cos"     ) { rval = new   CosOp( xml,argDefs ); }
-  else if ( name == "tan"     ) { rval = new   TanOp( xml,argDefs ); }
-  else if ( name == "asin"    ) { rval = new  AsinOp( xml,argDefs ); }
-  else if ( name == "acos"    ) { rval = new  AcosOp( xml,argDefs ); }
-  else if ( name == "atan"    ) { rval = new  AtanOp( xml,argDefs ); }
-  else if ( name == "deg"     ) { rval = new   DegOp( xml,argDefs ); }
-  else if ( name == "rad"     ) { rval = new   RadOp( xml,argDefs ); }
-  else if ( name == "abs"     ) { rval = new   AbsOp( xml,argDefs ); }
-  else if ( name == "sqrt"    ) { rval = new  SqrtOp( xml,argDefs ); }
-  else if ( name == "exp"     ) { rval = new   ExpOp( xml,argDefs ); }
-  else if ( name == "ln"      ) { rval = new    LnOp( xml,argDefs ); }
-  else if ( name == "log"     ) { rval = new   LogOp( xml,argDefs ); }
-  else if ( name == "sub"     ) { rval = new   SubOp( xml,argDefs ); }
-  else if ( name == "div"     ) { rval = new   DivOp( xml,argDefs ); }
-  else if ( name == "pow"     ) { rval = new   PowOp( xml,argDefs ); }
-  else if ( name == "mod"     ) { rval = new   ModOp( xml,argDefs ); }
-  else if ( name == "atan2"   ) { rval = new Atan2Op( xml,argDefs ); }
-  else if ( name == "add"     ) { rval = new   AddOp( xml,argDefs ); }
-  else if ( name == "mult"    ) { rval = new  MultOp( xml,argDefs ); }
-  else
-  {
-    INVALID_XML("Unrecognized operator name (" << name << ")");
-  }
-
-  return rval;
 }
 

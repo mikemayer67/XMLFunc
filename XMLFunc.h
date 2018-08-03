@@ -1,6 +1,7 @@
 #ifndef _XMLFUNC_H_
 #define _XMLFUNC_H_
 
+#include <ostream>
 #include <vector>
 #include <map>
 #include <string>
@@ -85,6 +86,12 @@ class XMLFunc
           return *this; 
         }
 
+        void write(std::ostream &s) const
+        {
+          if(type_ == Integer) { s << ival_; }
+          else                 { s << dval_; }
+        }
+
       private:
         /// \cond PRIVATE
         Type_t type_;
@@ -124,9 +131,9 @@ class XMLFunc
 
     virtual ~XMLFunc() 
     { 
-      for(std::vector<Operation *>::iterator i=funcs_.begin(); i!=funcs_.end(); ++i)
+      for(std::vector<Function>::iterator i=funcs_.begin(); i!=funcs_.end(); ++i)
       {
-        delete *i;
+        delete i->root;
       }
     }
 
@@ -207,12 +214,16 @@ class XMLFunc
 
         void add(Number::Type_t type, const std::string &name="");
 
-        int            count (void)  const { return int(types_.size()); }
+        bool empty (void) const { return types_.empty(); }
+        int  count (void) const { return int(types_.size()); }
+
         Number::Type_t type  (int i) const { return types_.at(i);  }
 
         size_t index(const std::string &name) const;
 
         std::pair<size_t,bool> find(const std::string &name) const;
+
+        void clear(void) { types_.clear(); xref_.clear(); }
 
       private:
 
@@ -222,14 +233,25 @@ class XMLFunc
 
   private:
 
-    Number _eval(Operation *op, const Args &args) const;
+    struct Function
+    {
+      ArgDefs    argDefs;
+      Operation *root;
+      Function(void) : root(NULL) {}
+      Function(const ArgDefs &a, Operation *o) : argDefs(a), root(o) {}
+      Function(Operation *o, const ArgDefs &a) : argDefs(a), root(o) {}
+    };
 
-    ArgDefs                   argDefs_;
-    std::vector<Operation *>  funcs_;
-    Xref_t                    funcXref_;
+    Number _eval(const Function &, const Args &args) const;
 
+  private:
+
+    std::vector<Function> funcs_;
+    Xref_t                funcXref_;
 
     /// \endcond
 };
+
+static std::ostream &operator<<(std::ostream &s,const XMLFunc::Number &x) { x.write(s); return s; }
 
 #endif // _XMLFUNC_h_

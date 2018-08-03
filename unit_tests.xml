@@ -1,0 +1,114 @@
+<!--Start of with each of the input operators -->
+<!--These each take a single double argument named x-->
+
+<arglist>
+  <arg name="x"/>
+</arglist>
+
+<func name="neg"><neg><arg index=0/></neg></func>
+<func name="abs"><abs><arg index=0/></abs></func>
+
+<func name="sin"><sin arg=x/></func>
+<func name="cos"><cos arg=x/></func>
+<func name="tan"><tan arg=x/></func>
+
+<func name="asin"><asin><arg name=x/></asin></func>
+<func name="acos"><acos><arg name=x/></acos></func>
+<func name="atan"><atan><arg name=x/></atan></func>
+
+<func name="deg"><deg arg=x/></func>
+<func name="rad"><rad arg=x/></func>
+
+<func name="sqrt"><sqrt arg=x/></func>
+<func name="exp"><exp arg=x/></func>
+<func name="ln"><ln arg=x/></func>
+
+<func name="log10"><log arg=x base=10/></func>
+<func name="log2"><log base=2><arg index=0/></log></func>
+
+<!--Repeat above using an integer argument-->
+
+<arglist>
+  <arg name="x" type='integer'/>
+</arglist>
+
+<func name="i_neg"><neg><arg index=0/></neg></func>
+<func name="i_abs"><abs><arg index=0/></abs></func>
+
+<func name="i_sin"><sin arg=x/></func>
+<func name="i_cos"><cos arg=x/></func>
+<func name="i_tan"><tan arg=x/></func>
+
+<func name="i_asin"><asin><arg name=x/></asin></func>
+<func name="i_acos"><acos><arg name=x/></acos></func>
+<func name="i_atan"><atan><arg name=x/></atan></func>
+
+<func name="i_deg"><deg arg=x/></func>
+<func name="i_rad"><rad arg=x/></func>
+
+<func name="i_sqrt"><sqrt arg=x/></func>
+<func name="i_exp"><exp arg=x/></func>
+<func name="i_ln"><ln arg=x/></func>
+
+<func name="i_log10"><log arg=x base=10/></func>
+<func name="i_log2"><log base=2><arg index=0/></log></func>
+
+<!--Binary operators-->
+<!--Each creates its own arglist-->
+<!--Each uses different ways of referencing the arguments-->
+
+<func name=sub>
+  <arglist><arg type=integer name=a/><arg type=integer name=b/></arglist>
+  <sub arg1=a arg2=b/>
+</func>
+
+<func name=div>
+  <arglist><arg/><arg name=divisor type=integer/></arglist>
+  <sub arg2=divisor><arg index=0/></sub>
+</func>
+
+<func name=pow>
+  <arglist><arg name=x/><arg name=n/></arglist>
+  <pow arg1='x'><arg name=n/></pow>
+</func>
+
+<func name=squared>
+  <arglist><arg/></arglist>
+  <pow arg2=2><arg index=0/></pow>
+</func>
+
+<func name=mod>
+  <arglist><arg name=x/><arg name=n type=integer/></arglist>
+  <mod arg1='x' arg2='n'/>
+</func>
+
+<func name=atan2>
+  <arglist><arg name=y/><arg name=x/></arglist>
+  <atan2><arg name=y/><arg index=1/></atan2>
+</func>
+
+<!--List operators-->
+<!--Shares a common arlist with four unnamed doubles-->
+<!--Introduces a const value as a fifth operand-->
+
+<arglist><arg/><arg/><arg/><arg/></arglist>
+
+<func name=add>
+  <add arg1=100.5>
+    <arg index=0/>
+    <arg index=1/>
+    <arg index=3/>
+  </add>
+</func>
+
+<func name=mult>
+  <mult>
+    <int value=1.1/>
+    <arg index=0/>
+    <arg index=1/>
+    <arg index=3/>
+  </mult>
+</func>
+
+
+

@@ -1,5 +1,4 @@
 <?xml  ?>
-<!-- Quadratic function using the minus option -->
 <arglist>
   <arg name="a" type="double"/>
   <arg name="b"/>
@@ -7,7 +6,15 @@
   <arg name="d" type="integer"/>
 </arglist>
 
-<func>
+<!-- Quadratic function using the minus option -->
+<!-- No "funny business here -->
+<func name="root1">
+  <arglist>
+    <arg name="a"/>
+    <arg name="b"/>
+    <arg name="c"/>
+  </arglist>
+
   <div>
     <sub>
       <neg arg="b"/>
@@ -22,6 +29,10 @@
   </div>
 </func>
 
+<!-- Quadratic function using the plus option -->
+<!-- Uses default arglist with following "strangeness" -->
+<!--   third parameter is unnamed and must be an integer -->
+<!--   fourth (integer) parameter is required, but never used -->
 <func name="root2">
   <div>
     <add>
