@@ -180,7 +180,7 @@ Argument lists define the arguments that must be passed to a function when evalu
 
 Each argument in the \<arglist> is defined with the \<arg> tag.  
 
-    <arg name=var-name type=var-type/>
+    &lt;arg name=var-name type=var-type/>
 
 - Must be specified in the order they will be passed to XMLFunc::eval()
 - Optional type attribute may have a value of either *integer* or *double*
@@ -190,10 +190,10 @@ Each argument in the \<arglist> is defined with the \<arg> tag.
 
 > **Example**<br/>
 > <pre>
-> <arglist>
+> &lt;arglist>
 >   <\arg name="exponent" type="integer"/>
 >   <\arg name="base"     type="double"/>
-> </arglist>
+> &lt;/arglist>
 > </pre>
 
 ## Function Elements
