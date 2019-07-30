@@ -46,7 +46,7 @@ The **third method** may be used with any function that was given a name in its 
 
     XMLFunc::Number eval(const string &name, XMLFunc::Args &args) const
 
-- **index** indicates which function to evaluate where 0 represents the first defined function
+- **name** indicates which function to evaluate
 - **args** is a list of values being passed to the function for evaluation. 
 
 In all eval methods, the length of the list must match or exceed the number of arguments identified in the \<arglist> element in the input XML having insufficient values results 
