@@ -211,15 +211,15 @@ Function elements define a function that can be evaluated with XMLFunc::eval().
 
 > **Example**
 > <pre>
-> \<arglist>...\</arglist>
-> \<!-- First function (index=0, *no-name*) -->
-> \<func>\<*ve*>...\</*ve*>\</func> 
-> \<!-- Second function (index=1, name='foo') -->
-> \<func name='foo'>\<*ve*>...\</*ve*>\</func>
-> \<!-- Third function (index=2, name='bar') -->
-> \<func name='bar'>\<*ve*>...\</*ve*>\</func> 
-> \<!-- Fourth function (index=3, *no-name*) -->
-> \<func>\<*ve*>...\</*ve*>\</func>  
+> &lt;arglist>...&lt;/arglist>
+> &lt;!-- First function (index=0, *no-name*) -->
+> &lt;func>&lt;*ve*>...&lt;/*ve*>&lt;/func> 
+> &lt;!-- Second function (index=1, name='foo') -->
+> &lt;func name='foo'>&lt;*ve*>...&lt;/*ve*>&lt;/func>
+> &lt;!-- Third function (index=2, name='bar') -->
+> &lt;func name='bar'>&lt;*ve*>...&lt;/*ve*>&lt;/func> 
+> &lt;!-- Fourth function (index=3, *no-name*) -->
+> &lt;func>&lt;*ve*>...&lt;/*ve*>&lt;/func>  
 > </pre>
 
 ## Value Elements
