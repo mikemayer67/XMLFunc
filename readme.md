@@ -260,7 +260,7 @@ Constants elements represent numerical values that (*no surprise here*) don't ch
 Argument elements reference one of the elements in the input array of values. 
 
 - can change with every invocation of XMLFunc::eval()
-- are identified with the <arg> tag
+- are identified with the \<arg> tag
 - must be qualified with either a name or index attribute (but not both)
 
 > **argument** := \<arg name="name"> | \<arg index="index">
