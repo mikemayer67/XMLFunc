@@ -191,8 +191,8 @@ Each argument in the \<arglist> is defined with the \<arg> tag.
 > **Example**<br/>
 > <pre>
 > &lt;arglist>
->   <arg name="exponent" type="integer"/>
->   <arg name="base"     type="double"/>
+>   &lt;arg name="exponent" type="integer"/>
+>   &lt;arg name="base"     type="double"/>
 > &lt;/arglist>
 > </pre>
 
