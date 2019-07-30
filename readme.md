@@ -265,7 +265,7 @@ Argument elements reference one of the elements in the input array of values.
 
 > **argument** := \<arg name="name"> | \<arg index="index">
 > 
-> - if qualified by name, the name must exactly match one of the named arguments in <arglist><br/>
+> - if qualified by name, the name must exactly match one of the named arguments in \<arglist><br/>
 > - if qualified by index, the index must be an integer in the range 0 to (num_args-1)
 
 
